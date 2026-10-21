@@ -1,4 +1,22 @@
+# Git Ignore Rules for AV-Ready-Saudi
+# Exclude heavy binary / LiDAR datasets (over GitHub 100MB limit)
+Data/a2rl_labeled/
+Data/car_race_datatset_labelled/
+Data/a2rl_data-*/
+*.pcd
+*.bin
+
+# Temporary & database files
 *.bak
 *.trn
+*.log
+*.tmp
+*.temp
+
+# IDE & OS caches
 .vscode/
+.idea/
 __pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
