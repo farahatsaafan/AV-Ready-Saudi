@@ -1,12 +1,12 @@
-# 🚗 AV-Ready-Saudi: Data Warehouse & Data Mining Project
+# AV-Ready-Saudi: Data Warehouse & Data Mining Project
 
-**New Mansoura University — Faculty of Computer Science and Engineering**  
+**New Mansoura University - Faculty of Computer Science and Engineering**  
 **Course:** Data Mining & Data Warehousing  
 **Project:** Autonomous Vehicles (AV) Environmental Readiness, Route Risk & Safety in Saudi Arabia  
 
 ---
 
-## 📌 1. Project Purpose & Analytical Questions
+## 1. Project Purpose & Analytical Questions
 The objective of **AV-Ready-Saudi** is to build a robust, reproducible, multi-tier data warehouse and feature store assessing whether and where autonomous vehicles can operate safely in the Kingdom of Saudi Arabia.
 
 The core research questions:
@@ -16,7 +16,7 @@ The core research questions:
 
 ---
 
-## 🏛️ 2. Architectural Blueprint (Medallion Model)
+## 2. Architectural Blueprint (Medallion Model)
 
 ```mermaid
 flowchart LR
@@ -44,12 +44,12 @@ flowchart LR
 
 ---
 
-## 📂 3. Repository Structure
+## 3. Repository Structure
 Organized strictly in accordance with Unit 1, Unit 2, and Unit 3 course conventions:
 
 ```text
 AV-Ready-Saudi/
-├── .gitignore                      <-- Excludes heavy LiDAR/point clouds (>100MB)
+├── .gitignore                      <-- Excludes heavy raw files & point clouds
 ├── README.md                       <-- Reproduction contract & execution guide
 ├── docs/                           <-- System documentation & academic deliverables
 │   ├── 01_architecture_overview.md  <-- Pipeline & KDD alignment
@@ -78,18 +78,18 @@ AV-Ready-Saudi/
 
 ---
 
-## 📦 4. Data Sources & Download Link
+## 4. Data Sources & Download Link
 The datasets required for this project are hosted on Google Drive:
-* 🔗 **Google Drive Dataset Repository**: [Download AV-Ready-Saudi Data (Latest)](https://drive.google.com/file/d/1ZPtgK1dFpnbVAcuyYio4FoK6OHiQeWcy/view?usp=drive_link)
+* **Google Drive Dataset Repository**: [Download AV-Ready-Saudi Data (Latest)](https://drive.google.com/file/d/1ZPtgK1dFpnbVAcuyYio4FoK6OHiQeWcy/view?usp=drive_link)
 
 Place the extracted files inside the local `Data/` folder:
-* `Data/saudi_weather_daily_2019_2024.csv` (21,920 rows - Open-Meteo Historical Archive)
-* `Data/saudi_traffic_accidents_2019_2024.csv` (5,066 rows - Saudi Highway Traffic Safety)
-* `Data/av_telemetry_failures_saudi.csv` (15,000 rows - AV Fleet Telemetry & Sensor Failures)
+* `Data/saudi_weather_daily_2019_2024.csv` (21,920 rows - Open-Meteo Historical Archive across 10 Saudi cities)
+* `Data/saudi_traffic_accidents_2019_2024.csv` (5,066 rows - Saudi Highway Traffic Safety & Incident Records)
+* `Data/av_telemetry_failures_saudi.csv` (15,000 rows - AV Fleet Telemetry & Environmental Sensor Failures)
 
 ---
 
-## ⚡ 5. How to Reproduce the Pipeline (Execution Contract)
+## 5. How to Reproduce the Pipeline (Execution Contract)
 
 Run the SQL scripts in order using **SQL Server Management Studio (SSMS)** or `sqlcmd`:
 
@@ -125,12 +125,12 @@ EXEC gold.load_gold;
 ```
 *Verify Feature View*:
 ```sql
-SELECT TOP 10 * FROM gold.vw_av_mining_features ORDER BY total_low_visibility_hours DESC;
+SELECT TOP 10 * FROM gold.vw_av_mining_features ORDER BY total_recorded_days DESC;
 ```
 
 ---
 
-## 👥 6. Team Collaboration Guidelines
+## 6. Team Collaboration Guidelines
 * Never commit heavy LiDAR `.pcd` point clouds or database backups to GitHub.
 * Pull latest updates before branching: `git pull origin main`.
 * Create feature branches for each task: `git checkout -b feature/name`.

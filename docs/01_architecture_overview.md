@@ -16,9 +16,9 @@ Following the course curriculum (Unit 1, Lesson 1.1), the architecture distingui
 ```mermaid
 flowchart TD
     subgraph Data Engineering Pipeline
-        S1["Saudi Weather Source (249K rows)"] --> B1["Bronze Landing (Untyped Raw)"]
-        S2["Traffic Accidents (168 rows)"] --> B2["Bronze Landing (Untyped Raw)"]
-        S3["AV Telemetry (389 rows)"] --> B3["Bronze Landing (Untyped Raw)"]
+        S1["Saudi Weather Source (21,920 rows)"] --> B1["Bronze Landing (Untyped Raw)"]
+        S2["Traffic Accidents (5,066 rows)"] --> B2["Bronze Landing (Untyped Raw)"]
+        S3["AV Telemetry & Failures (15,000 rows)"] --> B3["Bronze Landing (Untyped Raw)"]
         
         B1 & B2 & B3 -->|6 Verbs Cleansing & Deduping| SL["Silver Layer (Trusted & Typed)"]
         SL -->|Star Schema & Aggregations| GL["Gold Layer (Business Ready / Marts)"]
@@ -40,7 +40,7 @@ flowchart TD
 * **Goal**: Verbatim preservation of source files with minimal interpretation.
 * **Storage Schema**: `bronze.*`
 * **Permissive Typing**: All incoming fields are stored as `VARCHAR` / `NVARCHAR(MAX)` with `NULL` permitted to ensure zero load failures during raw ingestion.
-* **Full-Load Semantics**: Repeatable batch full loading via `TRUNCATE TABLE` followed by `BULK INSERT`.
+* **Full-Load Semantics**: Repeatable batch full loading via `TRUNCATE TABLE` followed by `BULK INSERT` with `CODEPAGE = '65001'` (UTF-8).
 * **Technical Lineage**: All batch runs are tracked in `audit.load_log` recording `batch_id` (GUID), execution timestamps, loaded counts, and operational status.
 
 ### B. Silver Layer (Cleaned & Trusted)
@@ -48,9 +48,9 @@ flowchart TD
 * **Storage Schema**: `silver.*`
 * **The Six Core Verbs**:
   1. **Trim**: Strip leading/trailing whitespaces (`NULLIF(TRIM(col), '')`).
-  2. **Standardize**: Canonical casing (`UPPER`), code consolidation, and metric normalization (e.g. stripping `%` from humidity).
-  3. **Convert**: Safe conversion to concrete types (`DATE`, `TIME`, `INT`, `DECIMAL`) via `TRY_CONVERT`.
-  4. **Deduplicate**: Window function `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ... DESC)` retaining the primary surviving version (`rn = 1`).
+  2. **Standardize**: Canonical casing (`UPPER`), code consolidation, and metric normalization.
+  3. **Convert**: Safe conversion to concrete types (`DATE`, `INT`, `DECIMAL`, `BIT`) via `TRY_CONVERT`.
+  4. **Deduplicate**: Window function `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ... ASC)` retaining the primary surviving version (`rn = 1`).
   5. **Validate & Reject**: Mandatory attribute violations are quarantined into `silver.reject_log` with actionable diagnostic reasons.
   6. **Transactional Atomicity**: Encapsulated within `BEGIN TRAN ... COMMIT / ROLLBACK` with `SET XACT_ABORT ON`.
 * **Reconciliation Equality**:
@@ -61,5 +61,7 @@ flowchart TD
 * **Storage Schema**: `gold.*`
 * **Key Artifacts**:
   * `gold.dim_weather_hazard`: Autonomous vehicle sensor impact taxonomy (LiDAR beam attenuation, optical camera occlusion).
-  * `gold.fact_city_daily_weather_risk`: Daily consolidated safety indexes, extreme heat durations, and low-visibility counters.
-  * `gold.vw_av_mining_features`: Model-ready tabular feature set for KDD algorithms.
+  * `gold.dim_city`: Geographic dimensions and coordinates across 10 major Saudi regions.
+  * `gold.dim_av_failure_type`: Catalog of AV failure categories and severity ratings.
+  * `gold.fact_city_daily_weather_risk`: Daily consolidated safety index (`av_readiness_score`), extreme heat flags, and sensor hazard indicators.
+  * `gold.vw_av_mining_features`: Model-ready tabular feature set for KDD algorithms (Clustering, Classification, Association Rules).
