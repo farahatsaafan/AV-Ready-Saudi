@@ -2,24 +2,28 @@
 -- Project: AV-Ready-Saudi
 -- Script: 02_silver_reconciliation.sql
 -- Purpose: Implement course reconciliation formula: Bronze = Silver + Rejected + Duplicates
--- Reference: Unit 3 Lab 4 (Step 8: Prove - Reconcile the counts)
+-- Reference: Unit 3 Lab 4 (Step 8: Prove - Reconcile the counts & Audit Quarantine)
 -- ==============================================================================
 
 USE av_ready_saudi_dw;
 GO
 
+-- ------------------------------------------------------------------------------
+-- 1. Course Reconciliation Formula Gate: Prove Zero Data Loss
+-- Formula: Bronze = Silver (Accepted) + Rejected (Quarantined) + Duplicates Removed
+-- ------------------------------------------------------------------------------
 SELECT 
     'sa_weather' AS entity_table,
     (SELECT COUNT(*) FROM bronze.sa_weather) AS bronze_raw_rows,
     (SELECT COUNT(*) FROM silver.sa_weather) AS silver_clean_rows,
     (SELECT COUNT(*) FROM silver.reject_log WHERE source_table = 'bronze.sa_weather') AS rejected_rows,
     ((SELECT COUNT(*) FROM bronze.sa_weather) 
-     - (SELECT COUNT(DISTINCT city + '|' + weather_date + '|' + weather_time) FROM bronze.sa_weather)) AS duplicates_detected,
+     - (SELECT COUNT(DISTINCT city_id + '|' + [date]) FROM bronze.sa_weather)) AS duplicates_detected,
     CASE 
         WHEN (SELECT COUNT(*) FROM bronze.sa_weather) = 
              (SELECT COUNT(*) FROM silver.sa_weather) + 
              (SELECT COUNT(*) FROM silver.reject_log WHERE source_table = 'bronze.sa_weather') + 
-             ((SELECT COUNT(*) FROM bronze.sa_weather) - (SELECT COUNT(DISTINCT city + '|' + weather_date + '|' + weather_time) FROM bronze.sa_weather))
+             ((SELECT COUNT(*) FROM bronze.sa_weather) - (SELECT COUNT(DISTINCT city_id + '|' + [date]) FROM bronze.sa_weather))
         THEN 'BALANCED (MATCH)' 
         ELSE 'MISMATCH' 
     END AS reconciliation_status
@@ -30,12 +34,12 @@ SELECT
     (SELECT COUNT(*) FROM silver.sa_traffic_accidents),
     (SELECT COUNT(*) FROM silver.reject_log WHERE source_table = 'bronze.sa_traffic_accidents'),
     ((SELECT COUNT(*) FROM bronze.sa_traffic_accidents) 
-     - (SELECT COUNT(DISTINCT accident_year + '|' + region + '|' + indicator) FROM bronze.sa_traffic_accidents)),
+     - (SELECT COUNT(DISTINCT accident_id) FROM bronze.sa_traffic_accidents)),
     CASE 
         WHEN (SELECT COUNT(*) FROM bronze.sa_traffic_accidents) = 
              (SELECT COUNT(*) FROM silver.sa_traffic_accidents) + 
              (SELECT COUNT(*) FROM silver.reject_log WHERE source_table = 'bronze.sa_traffic_accidents') + 
-             ((SELECT COUNT(*) FROM bronze.sa_traffic_accidents) - (SELECT COUNT(DISTINCT accident_year + '|' + region + '|' + indicator) FROM bronze.sa_traffic_accidents))
+             ((SELECT COUNT(*) FROM bronze.sa_traffic_accidents) - (SELECT COUNT(DISTINCT accident_id) FROM bronze.sa_traffic_accidents))
         THEN 'BALANCED (MATCH)' 
         ELSE 'MISMATCH' 
     END
@@ -46,13 +50,43 @@ SELECT
     (SELECT COUNT(*) FROM silver.av_telemetry),
     (SELECT COUNT(*) FROM silver.reject_log WHERE source_table = 'bronze.av_telemetry'),
     ((SELECT COUNT(*) FROM bronze.av_telemetry) 
-     - (SELECT COUNT(DISTINCT frame_id) FROM bronze.av_telemetry)),
+     - (SELECT COUNT(DISTINCT telemetry_id) FROM bronze.av_telemetry)),
     CASE 
         WHEN (SELECT COUNT(*) FROM bronze.av_telemetry) = 
              (SELECT COUNT(*) FROM silver.av_telemetry) + 
              (SELECT COUNT(*) FROM silver.reject_log WHERE source_table = 'bronze.av_telemetry') + 
-             ((SELECT COUNT(*) FROM bronze.av_telemetry) - (SELECT COUNT(DISTINCT frame_id) FROM bronze.av_telemetry))
+             ((SELECT COUNT(*) FROM bronze.av_telemetry) - (SELECT COUNT(DISTINCT telemetry_id) FROM bronze.av_telemetry))
         THEN 'BALANCED (MATCH)' 
         ELSE 'MISMATCH' 
     END;
+GO
+
+-- ------------------------------------------------------------------------------
+-- 2. Audit Quarantine: Inspect Reasons for Rejections (if any)
+-- ------------------------------------------------------------------------------
+SELECT 
+    source_table,
+    reason,
+    COUNT(*) AS rejected_count
+FROM silver.reject_log
+GROUP BY source_table, reason
+ORDER BY rejected_count DESC;
+GO
+
+-- ------------------------------------------------------------------------------
+-- 3. Lineage Verification: Audit Execution Trail
+-- ------------------------------------------------------------------------------
+SELECT TOP 6
+    load_id,
+    batch_id,
+    source_name,
+    target_table,
+    start_time,
+    end_time,
+    rows_loaded,
+    status,
+    message
+FROM audit.load_log
+WHERE target_table LIKE 'silver.%'
+ORDER BY load_id DESC;
 GO
