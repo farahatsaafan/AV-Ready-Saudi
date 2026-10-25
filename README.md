@@ -80,7 +80,7 @@ AV-Ready-Saudi/
 
 ## 4. Data Sources & Download Link
 The datasets required for this project are hosted on Google Drive:
-* **Google Drive Dataset Repository**: [Download AV-Ready-Saudi Data (Latest)](https://drive.google.com/file/d/1ZPtgK1dFpnbVAcuyYio4FoK6OHiQeWcy/view?usp=drive_link)
+* **Google Drive Dataset Repository**: [Download AV-Ready-Saudi Data (Latest)](https://drive.google.com/file/d/1ZPtgK1dFpnbVAcuyYio4FoK6OHiQeWcy/view?usp=sharing)
 
 Place the extracted files inside the local `Data/` folder:
 * `Data/saudi_weather_daily_2019_2024.csv` (21,920 rows - Open-Meteo Historical Archive across 10 Saudi cities)
