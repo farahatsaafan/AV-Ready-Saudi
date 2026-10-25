@@ -21,9 +21,9 @@ The core research questions:
 ```mermaid
 flowchart LR
     A["Raw Data Sources
-- Saudi Weather (249K rows)
-- Traffic Accidents (168 rows)
-- AV Telemetry (389 rows)"] -->|TRUNCATE + BULK INSERT| B["Bronze Layer
+- Saudi Weather (21,920 rows)
+- Traffic Accidents (5,066 rows)
+- AV Telemetry (15,000 rows)"] -->|TRUNCATE + BULK INSERT| B["Bronze Layer
 - Raw Landing
 - Permissive VARCHAR NULL
 - Preserves all defects
@@ -80,12 +80,12 @@ AV-Ready-Saudi/
 
 ## 📦 4. Data Sources & Download Link
 The datasets required for this project are hosted on Google Drive:
-* 🔗 **Google Drive Dataset Repository**: [Download AV-Ready-Saudi Data](https://drive.google.com/drive/folders/1TEnI7ki_svD5FSDBWtiwZdyROcEYpfDy?usp=drive_link)
+* 🔗 **Google Drive Dataset Repository**: [Download AV-Ready-Saudi Data (Latest)](https://drive.google.com/file/d/1ZPtgK1dFpnbVAcuyYio4FoK6OHiQeWcy/view?usp=drive_link)
 
 Place the extracted files inside the local `Data/` folder:
-* `Data/weather-sa-2017-2019-clean.csv` (249,023 rows)
-* `Data/saudi-arabia-traffic-accidents-and-casualties-injured-dead-2008.csv` (168 rows)
-* `Data/A2RL_IAC_prediction_annotations/a2rl_raw.csv` (389 rows)
+* `Data/saudi_weather_daily_2019_2024.csv` (21,920 rows - Open-Meteo Historical Archive)
+* `Data/saudi_traffic_accidents_2019_2024.csv` (5,066 rows - Saudi Highway Traffic Safety)
+* `Data/av_telemetry_failures_saudi.csv` (15,000 rows - AV Fleet Telemetry & Sensor Failures)
 
 ---
 
