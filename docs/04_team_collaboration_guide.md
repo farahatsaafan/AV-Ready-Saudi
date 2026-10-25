@@ -23,7 +23,7 @@ cd AV-Ready-Saudi
 
 ### الخطوة 2: تحميل حزمة البيانات الرسمية (Data Download)
 نظراً للحجم الكبير لملفات البيانات التاريخية وحساسات القيادة الذاتية، يتم تحميلها من الرابط الرسمي الموحد:
-* **رابط تحميل البيانات من Google Drive:** [تحميل حزمة البيانات المعتمدة AV-Ready-Saudi](https://drive.google.com/file/d/1ZPtgK1dFpnbVAcuyYio4FoK6OHiQeWcy/view?usp=sharing)
+* **رابط تحميل البيانات من Google Drive:** [تحميل حزمة البيانات المعتمدة AV-Ready-Saudi](https://drive.google.com/drive/folders/1ehqYZj7pMf8gUf-10DxyHAhyGpUt86tH)
 * قم بفك ضغط الملفات داخل مجلد `Data/` في المشروع، ليكون الهيكل كالتالي:
   ```text
   AV-Ready-Saudi/Data/saudi_weather_daily_2019_2024.csv
