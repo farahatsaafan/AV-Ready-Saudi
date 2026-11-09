@@ -34,8 +34,8 @@
    * [https://open.data.gov.sa/](https://open.data.gov.sa/)
    * *الشرح:* البوابة الوطنية الرسمية لحكومة المملكة للبيانات المفتوحة (تضم بيانات النقل والمرور والإحصاءات الحيوية).
 2. **رابط مستودع بيانات حوادث المرور والإصابات حسب المناطق (KAPSARC Data Portal - Saudi Traffic Accidents):**
-   * [https://data.kapsarc.org/explore/dataset/saudi-traffic-accidents-and-casualties-by-region/](https://data.kapsarc.org/explore/dataset/saudi-traffic-accidents-and-casualties-by-region/)
-   * *الشرح:* بوابة بيانات مركز الملك عبد الله للدراسات والبحوث (KAPSARC) التي توفر التنزيل المباشر بصيغ CSV و JSON لمؤشرات الحوادث والإصابات والوفيات الصادرة عن الهيئة العامة للإحصاء (GASTAT).
+   * [https://data.kapsarc.org/explore/dataset/saudi-arabia-traffic-accidents-and-casualties-injured-dead-2008/](https://data.kapsarc.org/explore/dataset/saudi-arabia-traffic-accidents-and-casualties-injured-dead-2008/)
+   * *الشرح:* بوابة بيانات مركز الملك عبد الله للدراسات والبحوث (KAPSARC) الرسمية التي توفر التنزيل المباشر بصيغ CSV و JSON لمؤشرات الحوادث والإصابات والوفيات الصادرة عن الهيئة العامة للإحصاء (GASTAT).
 3. **الهيئة العامة للإحصاء بالمملكة العربية السعودية (GASTAT):**
    * [https://www.stats.gov.sa/](https://www.stats.gov.sa/)
    * *الشرح:* نشرات إحصاءات السلامة المرورية وحوادث الطرق الدورية الرسمية.
@@ -53,10 +53,13 @@
   * `Data/saudi_av_tire_pressure_blowout_failures.csv` (6,000 صف)
 
 ### 🔗 روابط المصدر المباشرة:
-1. **تقارير انفصال القيادة الذاتية الرسمية (California DMV Autonomous Vehicle Disengagement Reports):**
-   * [https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/disengagement-reports/](https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/disengagement-reports/)
-   * *الشرح:* السجلات الرسمية العالمية الإلزامية لشركات المركبات الذكية (Waymo, Cruise, Zoox, Apple) عن أسباب انفصال النظام الآلي وتدخل السائق البشري بسبب الطقس والحساسات.
-2. **تقارير تصادمات المركبات ذاتية القيادة (California DMV Collision Reports):**
-   * [https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/autonomous-vehicle-collision-reports/](https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/autonomous-vehicle-collision-reports/)
-3. **بيانات الحساسات والتليماتري القياسية (Microsoft Azure Predictive Maintenance):**
-   * [https://azuremlsampleexperiments.blob.core.windows.net/datasets/PdM_telemetry.csv](https://azuremlsampleexperiments.blob.core.windows.net/datasets/PdM_telemetry.csv)
+1. **تقارير انفصال واختبارات القيادة الذاتية الرسمية (California DMV Autonomous Vehicles Portal):**
+   * [https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/](https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/)
+   * *الشرح:* البوابة الرسمية العالمية لسجلات شركات المركبات الذكية (Waymo, Cruise, Zoox, Apple) عن أسباب انفصال النظام الآلي وتدخل السائق البشري واختبارات الحساسات.
+2. **بيانات الحساسات والتليماتري القياسية من مايكروسوفت (Microsoft Azure Predictive Maintenance):**
+   * [https://raw.githubusercontent.com/microsoft/sqlworkshops/master/SQLServerAndAzureMachineLearning/ML%20Services%20for%20SQL%20Server/data/PdM_telemetry.csv](https://raw.githubusercontent.com/microsoft/sqlworkshops/master/SQLServerAndAzureMachineLearning/ML%20Services%20for%20SQL%20Server/data/PdM_telemetry.csv)
+   * [https://github.com/microsoft/sqlworkshops/blob/master/SQLServerAndAzureMachineLearning/ML%20Services%20for%20SQL%20Server/data/PdM_telemetry.csv](https://github.com/microsoft/sqlworkshops/blob/master/SQLServerAndAzureMachineLearning/ML%20Services%20for%20SQL%20Server/data/PdM_telemetry.csv)
+   * *الشرح:* مستودع مايكروسوفت الرسمي لبيانات التليماتري والحساسات والأعطال الزمنية للمركبات.
+3. **مستودع البيانات الكامل الموحد على Google Drive:**
+   * [https://drive.google.com/drive/folders/1ehqYZj7pMf8gUf-10DxyHAhyGpUt86tH](https://drive.google.com/drive/folders/1ehqYZj7pMf8gUf-10DxyHAhyGpUt86tH)
+   * *الشرح:* المجلد السحابي المعتمد للمشروع ويحتوي على كافة ملفات الـ CSV الستة كاملة والمضغوطة وجاهزة للتحميل المباشر.
