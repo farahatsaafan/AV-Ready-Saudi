@@ -19,3 +19,5 @@ __pycache__/
 *.py[cod]
 .DS_Store
 Thumbs.db
+
+reference_sample/

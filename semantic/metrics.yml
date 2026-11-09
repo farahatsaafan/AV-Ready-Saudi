@@ -1,0 +1,53 @@
+# Semantic Layer Metric Definitions (Course Skeleton Fall 2026)
+# Every metric has: name, label, definition, owner, grain, sql, dimensions, null_policy, validation_query
+
+metrics:
+  - name: avg_av_readiness_score
+    label: "Average AV Environmental Readiness Index"
+    definition: "Mean synthesized autonomous vehicle operational readiness score (0 to 100) combining weather stability, low visibility, traffic incident density, and sensor attenuation."
+    owner: "Engineering Lead / Farahat Saafan"
+    grain: "one city per day (gold.fact_daily_av_risk)"
+    sql: "ROUND(AVG(f.av_readiness_score), 2)"
+    dimensions: [city_name_en, climate_zone, year_number, month_number]
+    null_policy: "Excludes days with null scores; readiness is computed for all 21,920 city-days."
+    validation_query: "SELECT ROUND(AVG(av_readiness_score), 2) FROM gold.fact_daily_av_risk"
+
+  - name: total_disengagements
+    label: "Total Autonomous Disengagements"
+    definition: "Total cumulative events where an autonomous vehicle required manual human safety takeover."
+    owner: "Fleet Safety Team"
+    grain: "one city per day (gold.fact_daily_av_risk)"
+    sql: "SUM(f.daily_disengagements_count)"
+    dimensions: [city_name_en, sensor_hazard_level, year_number, month_number]
+    null_policy: "Null counts default to 0."
+    validation_query: "SELECT SUM(CASE WHEN av_disengagement = 1 THEN 1 ELSE 0 END) FROM silver.av_telemetry"
+
+  - name: dust_storm_days
+    label: "Total Sand and Dust Storm Days"
+    definition: "Total days exhibiting active particulate sand/dust storms with high wind gusts (>= 45 km/h)."
+    owner: "Environmental Sensor Analytics"
+    grain: "one city per day (gold.fact_daily_av_risk)"
+    sql: "SUM(CASE WHEN f.is_dust_storm = 1 THEN 1 ELSE 0 END)"
+    dimensions: [city_name_en, climate_zone, year_number, month_number]
+    null_policy: "Non-dust days evaluate to 0."
+    validation_query: "SELECT COUNT(*) FROM silver.sa_weather WHERE is_dust_storm = 1"
+
+  - name: extreme_heat_days
+    label: "Total Extreme Heat Days (>45C)"
+    definition: "Total days where ambient maximum temperature reaches or exceeds 45 degrees Celsius, triggering GPU compute throttling risk."
+    owner: "Hardware Reliability Team"
+    grain: "one city per day (gold.fact_daily_av_risk)"
+    sql: "SUM(CASE WHEN f.is_extreme_heat = 1 THEN 1 ELSE 0 END)"
+    dimensions: [city_name_en, climate_zone, year_number, month_number]
+    null_policy: "Temperatures under 45C evaluate to 0."
+    validation_query: "SELECT COUNT(*) FROM silver.sa_weather WHERE is_extreme_heat = 1"
+
+  - name: total_highway_accidents
+    label: "Total Highway Traffic Collisions"
+    definition: "Total count of recorded highway vehicular collisions occurring in the designated corridor."
+    owner: "Traffic Safety Operations"
+    grain: "one city per day (gold.fact_daily_av_risk)"
+    sql: "SUM(f.daily_accident_count)"
+    dimensions: [city_name_en, year_number, month_number]
+    null_policy: "Days without accidents record 0."
+    validation_query: "SELECT COUNT(*) FROM silver.sa_traffic_accidents"

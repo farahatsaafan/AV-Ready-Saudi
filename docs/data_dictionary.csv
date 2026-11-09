@@ -1,0 +1,157 @@
+layer,table,column,data_type,definition,source,pii_flag,nullable,quality_rule
+bronze,sa_weather,date,VARCHAR(50),Observation calendar date as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,temp_max_c,VARCHAR(50),Daily maximum temperature Celsius as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,temp_min_c,VARCHAR(50),Daily minimum temperature Celsius as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,temp_mean_c,VARCHAR(50),Daily mean temperature Celsius as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,precipitation_mm,VARCHAR(50),Daily total precipitation mm as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,wind_speed_max_kmh,VARCHAR(50),Peak sustained wind speed km/h as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,wind_gusts_max_kmh,VARCHAR(50),Peak instantaneous wind gust km/h as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,solar_radiation_mj,VARCHAR(50),Daily total solar radiation MJ/m2 as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,weather_code_wmo,VARCHAR(50),WMO standardized weather code as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,city_id,VARCHAR(50),3-letter city airport code as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,city_name_en,VARCHAR(100),English city name as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,city_name_ar,NVARCHAR(100),Arabic city name as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,latitude,VARCHAR(50),City centroid latitude as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,longitude,VARCHAR(50),City centroid longitude as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,is_dust_storm,VARCHAR(50),Flag indicating dust storm condition as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,is_extreme_heat,VARCHAR(50),Flag indicating extreme heat (>45C) as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
+bronze,sa_weather,source_file,VARCHAR(500),Provenance: name of ingested raw file,system default,no,yes,valid file name
+bronze,sa_weather,ingested_at,DATETIME2,Provenance: precise timestamp of ingestion,system default,no,no,not in future
+bronze,sa_traffic_accidents,accident_id,VARCHAR(50),Traffic accident tracking ID as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,date,VARCHAR(50),Accident date as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,city_id,VARCHAR(50),Nearest urban center ID as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,road_name,NVARCHAR(150),Corridor or highway name as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,severity,VARCHAR(50),Crash severity category as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,primary_cause,VARCHAR(100),Primary collision cause attribution as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,vehicles_involved,VARCHAR(50),Count of vehicles involved as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,casualties_count,VARCHAR(50),Count of injured or deceased as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,weather_condition_code,VARCHAR(50),WMO weather code at crash site as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,ambient_temp_c,VARCHAR(50),Ambient temperature at crash time as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,wind_gusts_kmh,VARCHAR(50),Peak wind gusts at crash time as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
+bronze,sa_traffic_accidents,source_file,VARCHAR(500),Provenance: name of ingested raw file,system default,no,yes,valid file name
+bronze,sa_traffic_accidents,ingested_at,DATETIME2,Provenance: precise timestamp of ingestion,system default,no,no,not in future
+bronze,av_telemetry,telemetry_id,VARCHAR(50),Vehicle telemetry tracking ID as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,date,VARCHAR(50),Telemetry observation date as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,city_id,VARCHAR(50),Operating city ID as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,vehicle_id,VARCHAR(50),Autonomous vehicle fleet unit ID as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,speed_kmh,VARCHAR(50),Vehicle operating speed km/h as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,battery_temp_c,VARCHAR(50),EV battery pack core temperature Celsius as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,gpu_temp_c,VARCHAR(50),On-board AI compute GPU temperature Celsius as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,tire_pressure_psi,VARCHAR(50),Vehicle tire pressure PSI as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,lidar_attenuation_pct,VARCHAR(50),LiDAR pulse beam absorption percentage as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,camera_glare_index,VARCHAR(50),Camera lens direct solar saturation index as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,failure_occurred,VARCHAR(50),Binary flag indicating system failure as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,failure_type,VARCHAR(100),Specific component failure classification as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,severity,VARCHAR(50),Telemetry event severity level as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,av_disengagement,VARCHAR(50),Binary flag indicating autonomous disengagement as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
+bronze,av_telemetry,source_file,VARCHAR(500),Provenance: name of ingested raw file,system default,no,yes,valid file name
+bronze,av_telemetry,ingested_at,DATETIME2,Provenance: precise timestamp of ingestion,system default,no,no,not in future
+silver,sa_weather,weather_id,INT,Surrogate primary key,IDENTITY(1.1),no,no,positive integer
+silver,sa_weather,weather_date,DATE,Standardized observation date,bronze.sa_weather,no,no,valid date between 2019-01-01 and 2024-12-31
+silver,sa_weather,city_id,VARCHAR(10),Standardized 3-letter city airport code,bronze.sa_weather,no,no,in ('RUH','JED','DMM','MAK','MED','TIF','ABH','TBK','HAS','ULA')
+silver,sa_weather,city_name_en,NVARCHAR(100),English city name capitalized,bronze.sa_weather,no,no,trimmed not empty
+silver,sa_weather,city_name_ar,NVARCHAR(100),Arabic city name UTF-8,bronze.sa_weather,no,no,trimmed not empty
+silver,sa_weather,latitude,DECIMAL(10.6),City centroid latitude,bronze.sa_weather,no,no,between 16.0 and 33.0
+silver,sa_weather,longitude,DECIMAL(10.6),City centroid longitude,bronze.sa_weather,no,no,between 34.0 and 56.0
+silver,sa_weather,temp_max_c,DECIMAL(5.2),Maximum daily temperature Celsius,bronze.sa_weather,no,no,between -10.0 and 60.0
+silver,sa_weather,temp_min_c,DECIMAL(5.2),Minimum daily temperature Celsius,bronze.sa_weather,no,no,between -15.0 and 45.0
+silver,sa_weather,temp_mean_c,DECIMAL(5.2),Mean daily temperature Celsius,bronze.sa_weather,no,no,between -10.0 and 50.0
+silver,sa_weather,precipitation_mm,DECIMAL(6.2),Daily total precipitation mm,bronze.sa_weather,no,no,non-negative
+silver,sa_weather,wind_speed_max_kmh,DECIMAL(5.2),Maximum sustained wind speed km/h,bronze.sa_weather,no,no,non-negative
+silver,sa_weather,wind_gusts_max_kmh,DECIMAL(5.2),Peak instantaneous wind gusts km/h,bronze.sa_weather,no,no,non-negative
+silver,sa_weather,solar_radiation_mj,DECIMAL(6.2),Daily solar irradiance MJ/m2,bronze.sa_weather,no,no,non-negative
+silver,sa_weather,weather_code_wmo,INT,Standard WMO meteorological code,bronze.sa_weather,no,no,valid WMO code 0 to 99
+silver,sa_weather,is_dust_storm,BIT,Binary indicator for active sand/dust storm,bronze.sa_weather,no,no,0 or 1
+silver,sa_weather,is_extreme_heat,BIT,Binary indicator for ambient heat >= 45C,bronze.sa_weather,no,no,0 or 1
+silver,sa_weather,DW_create_date,DATETIME2,Lineage: timestamp when Silver row was committed,system default,no,no,not in future
+silver,sa_traffic_accidents,accident_surrogate_id,INT,Surrogate primary key,IDENTITY(1.1),no,no,positive integer
+silver,sa_traffic_accidents,accident_id,VARCHAR(50),Unique business crash identifier,bronze.sa_traffic_accidents,no,no,unique not empty
+silver,sa_traffic_accidents,accident_date,DATE,Standardized date of collision,bronze.sa_traffic_accidents,no,no,valid date between 2019 and 2024
+silver,sa_traffic_accidents,city_id,VARCHAR(10),Nearest city corridor hub,bronze.sa_traffic_accidents,no,no,valid city code
+silver,sa_traffic_accidents,road_name,NVARCHAR(150),Corridor highway name,bronze.sa_traffic_accidents,no,no,not empty
+silver,sa_traffic_accidents,severity,NVARCHAR(50),Standardized crash severity tier,bronze.sa_traffic_accidents,no,no,in ('FATAL_CHAIN_COLLISION','HIGH_MULTI_VEHICLE','HIGH','MODERATE','MINOR')
+silver,sa_traffic_accidents,primary_cause,NVARCHAR(100),Root cause attribution,bronze.sa_traffic_accidents,no,no,not empty
+silver,sa_traffic_accidents,vehicles_involved,INT,Total vehicles involved in collision,bronze.sa_traffic_accidents,no,no,greater than or equal to 1
+silver,sa_traffic_accidents,casualties_count,INT,Total injured or deceased casualties,bronze.sa_traffic_accidents,no,no,non-negative
+silver,sa_traffic_accidents,weather_condition_code,INT,Meteorological code at crash site,bronze.sa_traffic_accidents,no,yes,0 to 99 or NULL
+silver,sa_traffic_accidents,ambient_temp_c,DECIMAL(5.2),Ambient temperature at collision Celsius,bronze.sa_traffic_accidents,no,yes,between -10.0 and 60.0
+silver,sa_traffic_accidents,wind_gusts_kmh,DECIMAL(5.2),Wind gusts at collision km/h,bronze.sa_traffic_accidents,no,yes,non-negative
+silver,sa_traffic_accidents,DW_create_date,DATETIME2,Lineage: timestamp when Silver row was committed,system default,no,no,not in future
+silver,av_telemetry,telemetry_surrogate_id,INT,Surrogate primary key,IDENTITY(1.1),no,no,positive integer
+silver,av_telemetry,telemetry_id,VARCHAR(50),Unique business telemetry identifier,bronze.av_telemetry,no,no,unique not empty
+silver,av_telemetry,telemetry_date,DATE,Standardized observation date,bronze.av_telemetry,no,no,valid date between 2019 and 2024
+silver,av_telemetry,city_id,VARCHAR(10),Operating city code,bronze.av_telemetry,no,no,valid city code
+silver,av_telemetry,vehicle_id,VARCHAR(50),Fleet autonomous vehicle identifier,bronze.av_telemetry,no,no,pattern AV-SAUDI-XXX
+silver,av_telemetry,speed_kmh,DECIMAL(6.2),Operating vehicle speed km/h,bronze.av_telemetry,no,no,between 0.0 and 200.0
+silver,av_telemetry,battery_temp_c,DECIMAL(5.2),EV battery pack core temperature Celsius,bronze.av_telemetry,no,no,between 0.0 and 70.0
+silver,av_telemetry,gpu_temp_c,DECIMAL(5.2),AI compute GPU temperature Celsius,bronze.av_telemetry,no,no,between 20.0 and 95.0
+silver,av_telemetry,tire_pressure_psi,DECIMAL(5.2),Vehicle tire pressure PSI,bronze.av_telemetry,no,no,between 20.0 and 60.0
+silver,av_telemetry,lidar_attenuation_pct,DECIMAL(5.2),LiDAR pulse signal attenuation percentage,bronze.av_telemetry,no,no,between 0.0 and 100.0
+silver,av_telemetry,camera_glare_index,DECIMAL(4.2),Camera sensor direct solar blinding index,bronze.av_telemetry,no,no,between 0.0 and 1.0
+silver,av_telemetry,failure_occurred,BIT,Binary failure indicator flag,bronze.av_telemetry,no,no,0 or 1
+silver,av_telemetry,failure_type,NVARCHAR(100),Component failure mode description,bronze.av_telemetry,no,no,in ('NONE','LIDAR_DUST_OCCLUSION','CAMERA_SOLAR_BLINDING','BATTERY_THERMAL_THROTTLING','LANE_DETECTION_WATER_REFLECTION')
+silver,av_telemetry,severity,NVARCHAR(50),Standardized severity classification,bronze.av_telemetry,no,no,in ('NORMAL','MEDIUM','HIGH','CRITICAL')
+silver,av_telemetry,av_disengagement,BIT,Binary autonomous disengagement event,bronze.av_telemetry,no,no,0 or 1
+silver,av_telemetry,DW_create_date,DATETIME2,Lineage: timestamp when Silver row was committed,system default,no,no,not in future
+silver,reject_log,reject_id,BIGINT,Surrogate reject primary key,IDENTITY(1.1),no,no,positive integer
+silver,reject_log,source_table,VARCHAR(50),Name of the source table where defect occurred,system default,no,no,not empty
+silver,reject_log,business_key,VARCHAR(50),Natural identifier of the rejected row,source row,no,yes,identifier or NULL
+silver,reject_log,reason,VARCHAR(100),Actionable root cause explanation for rejection,validation logic,no,no,not empty
+silver,reject_log,DW_create_date,DATETIME2,Lineage: timestamp when row was quarantined,system default,no,no,not in future
+gold,dim_city,city_key,INT,Surrogate city dimension key,ROW_NUMBER(),no,no,positive integer
+gold,dim_city,city_id,VARCHAR(10),3-letter city airport code,silver.sa_weather,no,no,unique
+gold,dim_city,city_name_en,NVARCHAR(100),English city name,silver.sa_weather,no,no,not empty
+gold,dim_city,city_name_ar,NVARCHAR(100),Arabic city name UTF-8,silver.sa_weather,no,no,not empty
+gold,dim_city,latitude,DECIMAL(10.6),City latitude coordinate,silver.sa_weather,no,no,valid coordinate
+gold,dim_city,longitude,DECIMAL(10.6),City longitude coordinate,silver.sa_weather,no,no,valid coordinate
+gold,dim_city,climate_zone,VARCHAR(50),Regional climatic classification,business rules,no,no,not empty
+gold,dim_date,date_key,INT,Surrogate date key in YYYYMMDD format,conversion,no,no,integer 8 digits
+gold,dim_date,calendar_date,DATE,Calendar date,silver.sa_weather,no,no,between 2019 and 2024
+gold,dim_date,year_number,INT,Calendar year,silver.sa_weather,no,no,between 2019 and 2024
+gold,dim_date,month_number,INT,Calendar month,silver.sa_weather,no,no,between 1 and 12
+gold,dim_date,month_name,VARCHAR(20),English month name,silver.sa_weather,no,no,not empty
+gold,dim_date,quarter_number,INT,Calendar quarter,silver.sa_weather,no,no,between 1 and 4
+gold,dim_weather_hazard,hazard_key,INT,Surrogate hazard dimension key,ROW_NUMBER(),no,no,positive integer
+gold,dim_weather_hazard,weather_code_wmo,INT,WMO standard meteorological code,silver.sa_weather,no,no,0 to 99
+gold,dim_weather_hazard,sensor_hazard_level,NVARCHAR(20),AV sensor hazard rating tier,business taxonomy,no,no,in ('LOW','MEDIUM','HIGH','CRITICAL')
+gold,dim_weather_hazard,lidar_impact,NVARCHAR(150),Specific physical impact on LiDAR sensors,domain rules,no,no,not empty
+gold,dim_weather_hazard,camera_impact,NVARCHAR(150),Specific physical impact on optical cameras,domain rules,no,no,not empty
+gold,dim_av_failure_type,failure_type_key,INT,Surrogate failure type key,ROW_NUMBER(),no,no,positive integer
+gold,dim_av_failure_type,failure_type,NVARCHAR(100),Component failure classification,silver.av_telemetry,no,no,unique
+gold,dim_av_failure_type,subsystem,NVARCHAR(50),Automotive AV subsystem affected,taxonomy,no,no,in ('PERCEPTION_LIDAR','PERCEPTION_CAMERA','COMPUTE_HARDWARE','POWERTRAIN')
+gold,dim_av_failure_type,risk_level,NVARCHAR(20),Safety risk classification,taxonomy,no,no,in ('NORMAL','MEDIUM','HIGH','CRITICAL')
+gold,fact_daily_av_risk,city_key,INT,Foreign key referencing dim_city,gold.dim_city,no,no,valid foreign key
+gold,fact_daily_av_risk,date_key,INT,Foreign key referencing dim_date,gold.dim_date,no,no,valid foreign key
+gold,fact_daily_av_risk,hazard_key,INT,Foreign key referencing dim_weather_hazard,gold.dim_weather_hazard,no,no,valid foreign key
+gold,fact_daily_av_risk,avg_temp_c,DECIMAL(5.2),Mean daily temperature Celsius,silver.sa_weather,no,no,valid temperature
+gold,fact_daily_av_risk,max_temp_c,DECIMAL(5.2),Peak daily temperature Celsius,silver.sa_weather,no,no,valid temperature
+gold,fact_daily_av_risk,max_wind_gusts_kmh,DECIMAL(5.2),Peak wind gusts km/h,silver.sa_weather,no,no,non-negative
+gold,fact_daily_av_risk,is_dust_storm,BIT,Binary active dust storm indicator,silver.sa_weather,no,no,0 or 1
+gold,fact_daily_av_risk,is_extreme_heat,BIT,Binary ambient heat >= 45C indicator,silver.sa_weather,no,no,0 or 1
+gold,fact_daily_av_risk,daily_accident_count,INT,Aggregated highway accidents on this day,silver.sa_traffic_accidents,no,no,non-negative
+gold,fact_daily_av_risk,daily_casualties_count,INT,Aggregated casualties on this day,silver.sa_traffic_accidents,no,no,non-negative
+gold,fact_daily_av_risk,daily_av_trips_count,INT,Total recorded AV fleet trips on this day,silver.av_telemetry,no,no,non-negative
+gold,fact_daily_av_risk,daily_disengagements_count,INT,Total autonomous disengagements on this day,silver.av_telemetry,no,no,non-negative
+gold,fact_daily_av_risk,avg_lidar_attenuation_pct,DECIMAL(5.2),Mean LiDAR signal attenuation percentage,silver.av_telemetry,no,yes,between 0.0 and 100.0
+gold,fact_daily_av_risk,avg_camera_glare_index,DECIMAL(4.2),Mean camera solar glare saturation index,silver.av_telemetry,no,yes,between 0.0 and 1.0
+gold,fact_daily_av_risk,av_readiness_score,DECIMAL(5.2),Synthesized composite readiness index (0 to 100),composite formula,no,no,between 0.0 and 100.0
+gold,fact_daily_av_risk,DW_create_date,DATETIME2,Lineage: timestamp when Fact row was materialized,system default,no,no,not in future
+semantic,metric_catalog,metric_name,VARCHAR(100),Unique machine-readable metric identifier,semantic/metrics.yml,no,no,unique primary key
+semantic,metric_catalog,label,VARCHAR(200),Human-readable business metric title,semantic/metrics.yml,no,yes,not empty
+semantic,metric_catalog,definition,VARCHAR(1000),Formal analytical business definition,semantic/metrics.yml,no,no,not empty
+semantic,metric_catalog,owner,VARCHAR(100),Responsible team or analyst,semantic/metrics.yml,no,yes,not empty
+semantic,metric_catalog,grain,VARCHAR(200),Grain of the source fact table,semantic/metrics.yml,no,yes,explicit grain
+semantic,metric_catalog,sql_expression,VARCHAR(1000),Standard SQL aggregation formula,semantic/metrics.yml,no,no,valid SQL aggregation
+semantic,metric_catalog,dimensions,VARCHAR(500),Applicable slice and dice dimensions,semantic/metrics.yml,no,yes,comma-separated list
+semantic,metric_catalog,null_policy,VARCHAR(500),Policy for handling NULL and missing values,semantic/metrics.yml,no,yes,policy description
+semantic,metric_catalog,validation_query,VARCHAR(2000),Independent verification query,semantic/metrics.yml,no,yes,executable SQL
+semantic,metric_catalog,updated_at,DATETIME2,Last synchronization timestamp,system default,no,no,not in future
+ml,city_risk_clusters,city_id,VARCHAR(10),Natural city identifier,gold.features_city_monthly,no,no,valid city code
+ml,city_risk_clusters,year_number,INT,Calendar year of clustered period,gold.features_city_monthly,no,no,between 2019 and 2024
+ml,city_risk_clusters,month_number,INT,Calendar month of clustered period,gold.features_city_monthly,no,no,between 1 and 12
+ml,city_risk_clusters,cluster_id,INT,Assigned K-Means cluster (0=Optimal 1=Moderate 2=High Hazard),scikit-learn KMeans,no,no,integer 0 to 2
+ml,city_risk_clusters,operating_regime,VARCHAR(50),Assigned qualitative driving policy label,rule mapping,no,no,in ('OPTIMAL_REGIME','MODERATE_RISK_REGIME','HIGH_HAZARD_RESTRICTED')
+ml,city_risk_clusters,model_name,VARCHAR(100),Machine learning algorithm identifier,pipeline metadata,no,no,not empty
+ml,city_risk_clusters,model_version,VARCHAR(20),Version tracking identifier,pipeline metadata,no,no,e.g. v1.0
+ml,city_risk_clusters,run_id,VARCHAR(50),Unique execution GUID,pipeline metadata,no,no,valid UUID
+ml,city_risk_clusters,generated_at,DATETIME2,Model execution and inference timestamp,system default,no,no,not in future
