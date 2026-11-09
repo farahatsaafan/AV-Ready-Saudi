@@ -17,32 +17,32 @@ if (-not (Test-Path $sqlcmd)) {
 }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "🚀 Starting AV-Ready-Saudi Automated Pipeline" -ForegroundColor Cyan
+Write-Host "Starting AV-Ready-Saudi Automated Pipeline" -ForegroundColor Cyan
 Write-Host "Server Instance: $ServerInstance" -ForegroundColor Cyan
 Write-Host "Data Directory : $DataPath" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 function Run-SqlScript {
     param([string]$FilePath, [string]$StepName)
-    Write-Host "`n[▶] Running: $StepName ($FilePath) ..." -ForegroundColor Yellow
+    Write-Host "`n>>> Running: $StepName ($FilePath) ..." -ForegroundColor Yellow
     & $sqlcmd -S $ServerInstance -E -C -i $FilePath
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "[✖] Error in $StepName (Exit code: $LASTEXITCODE)" -ForegroundColor Red
+        Write-Host "[-] Error in $StepName (Exit code: $LASTEXITCODE)" -ForegroundColor Red
         return $false
     }
-    Write-Host "[✔] $StepName completed successfully." -ForegroundColor Green
+    Write-Host "[+] $StepName completed successfully." -ForegroundColor Green
     return $true
 }
 
 function Run-SqlQuery {
     param([string]$Query, [string]$StepName)
-    Write-Host "`n[▶] Executing Query: $StepName ..." -ForegroundColor Yellow
+    Write-Host "`n>>> Executing Query: $StepName ..." -ForegroundColor Yellow
     & $sqlcmd -S $ServerInstance -E -C -d av_ready_saudi_dw -Q $Query
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "[✖] Error in $StepName (Exit code: $LASTEXITCODE)" -ForegroundColor Red
+        Write-Host "[-] Error in $StepName (Exit code: $LASTEXITCODE)" -ForegroundColor Red
         return $false
     }
-    Write-Host "[✔] $StepName completed successfully." -ForegroundColor Green
+    Write-Host "[+] $StepName completed successfully." -ForegroundColor Green
     return $true
 }
 
@@ -68,11 +68,11 @@ if (-not (Run-SqlScript -FilePath "$PSScriptRoot\sql\05_feature_views.sql" -Step
 
 # 6. Quality Validation Gates
 Write-Host "`n==========================================================" -ForegroundColor Magenta
-Write-Host "🔍 Running Quality Gates & Validations..." -ForegroundColor Magenta
+Write-Host "Running Quality Gates and Validations..." -ForegroundColor Magenta
 Write-Host "==========================================================" -ForegroundColor Magenta
 Run-SqlScript -FilePath "$PSScriptRoot\sql\quality\01_bronze_validation.sql" -StepName "Bronze Validation"
 Run-SqlScript -FilePath "$PSScriptRoot\sql\quality\02_silver_reconciliation.sql" -StepName "Silver Reconciliation Gate"
 
 Write-Host "`n==========================================================" -ForegroundColor Green
-Write-Host "🎉 AV-Ready-Saudi Data Warehouse Pipeline is 100% Complete!" -ForegroundColor Green
+Write-Host "AV-Ready-Saudi Data Warehouse Pipeline is 100% Complete!" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green

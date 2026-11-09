@@ -133,10 +133,15 @@ BEGIN
         BEGIN TRAN;
 
         -- ----------------------------------------------------------------------
+        -- Step 0: Clear Fact Table before Dimensions
+        -- ----------------------------------------------------------------------
+        DELETE FROM gold.fact_daily_av_risk;
+
+        -- ----------------------------------------------------------------------
         -- Step 1: Refresh Dimensions
         -- ----------------------------------------------------------------------
         -- A) dim_city
-        TRUNCATE TABLE gold.dim_city;
+        DELETE FROM gold.dim_city;
         INSERT INTO gold.dim_city (city_id, city_name_en, city_name_ar, latitude, longitude, climate_zone)
         SELECT 
             city_id,
@@ -168,7 +173,7 @@ BEGIN
         FROM silver.sa_weather;
 
         -- C) dim_weather_hazard
-        TRUNCATE TABLE gold.dim_weather_hazard;
+        DELETE FROM gold.dim_weather_hazard;
         INSERT INTO gold.dim_weather_hazard (weather_code_wmo, sensor_hazard_level, lidar_impact, camera_impact)
         SELECT DISTINCT
             weather_code_wmo,
@@ -195,7 +200,7 @@ BEGIN
         FROM silver.sa_weather;
 
         -- D) dim_av_failure_type
-        TRUNCATE TABLE gold.dim_av_failure_type;
+        DELETE FROM gold.dim_av_failure_type;
         INSERT INTO gold.dim_av_failure_type (failure_type, subsystem, risk_level)
         SELECT DISTINCT
             failure_type,
