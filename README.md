@@ -45,7 +45,7 @@ flowchart LR
     A["Raw Data Sources
 - Saudi Weather (21,920 rows)
 - Traffic Accidents (5,066 rows)
-- AV Telemetry & Failures (15,000 rows)"] -->|TRUNCATE + BULK INSERT| B["Bronze Layer
+- AV Telemetry & Failures (12,000 rows)"] -->|TRUNCATE + BULK INSERT| B["Bronze Layer
 - Raw Landing (VARCHAR NULL)
 - Provenance (source_file, ingested_at)
 - audit.load_log lineage"]
@@ -94,7 +94,7 @@ AV-Ready-Saudi/
 ├── Data/                           <-- Local data directory (Downloaded from Google Drive)
 │   ├── saudi_weather_daily_2019_2024.csv          <-- 21,920 rows (Open-Meteo Historical Archive)
 │   ├── saudi_traffic_accidents_2019_2024.csv      <-- 5,066 rows (GASTAT / Ministry of Transport)
-│   ├── av_telemetry_failures_saudi.csv            <-- 15,000 rows (Consolidated AV Fleet Telemetry)
+│   ├── av_telemetry_failures_saudi.csv            <-- 12,000 rows (Consolidated AV Fleet Telemetry)
 │   ├── saudi_av_sensor_dust_storm_failures.csv    <-- 6,000 rows (Dust Storm & LiDAR Attenuation)
 │   ├── saudi_av_thermal_overheat_failures.csv     <-- 6,000 rows (Thermal Throttling & Compute Stress)
 │   ├── saudi_av_tire_pressure_blowout_failures.csv<-- 6,000 rows (Asphalt Heat & Tire Delamination)
@@ -121,7 +121,7 @@ The complete datasets are hosted on the official Google Drive folder:
 Place the extracted files inside the local `Data/` folder:
 1. `Data/saudi_weather_daily_2019_2024.csv` (21,920 rows)
 2. `Data/saudi_traffic_accidents_2019_2024.csv` (5,066 rows)
-3. `Data/av_telemetry_failures_saudi.csv` (15,000 rows)
+3. `Data/av_telemetry_failures_saudi.csv` (12,000 rows)
 4. `Data/saudi_av_sensor_dust_storm_failures.csv` (6,000 rows)
 5. `Data/saudi_av_thermal_overheat_failures.csv` (6,000 rows)
 6. `Data/saudi_av_tire_pressure_blowout_failures.csv` (6,000 rows)

@@ -37,7 +37,7 @@ All 3 primary data sources are registered in `docs/data_source_register.csv`:
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`SRC-WEA-01`** | `saudi_weather_daily_2019_2024.csv` | Tabular CSV | One row per city per day | 21,920 rows (10 cities $\times$ 6 years) | `date, city_id, temp_max_c, wind_gusts_max_kmh, solar_radiation_mj, weather_code_wmo, is_dust_storm, is_extreme_heat` | Open-Meteo Historical Archive API (ECMWF ERA5 / Saudi NCM stations) |
 | **`SRC-ACC-02`** | `saudi_traffic_accidents_2019_2024.csv` | Tabular CSV | One row per collision event | 5,066 rows | `accident_id, date, city_id, road_name, severity, primary_cause, vehicles_involved, casualties_count` | GASTAT Road Safety Bulletins & Ministry of Transport Open Data Portal |
-| **`SRC-TEL-03`** | `av_telemetry_failures_saudi.csv` | Tabular CSV | One row per vehicle trip | 15,000 rows (50 AV units) | `telemetry_id, date, city_id, vehicle_id, speed_kmh, battery_temp_c, gpu_temp_c, lidar_attenuation_pct, camera_glare_index, failure_type, av_disengagement` | California DMV Disengagement Reports & Fraunhofer Sensor Degradation Physics |
+| **`SRC-TEL-03`** | `av_telemetry_failures_saudi.csv` | Tabular CSV | One row per vehicle trip | 12,000 rows (50 AV units) | `telemetry_id, date, city_id, vehicle_id, speed_kmh, battery_temp_c, gpu_temp_c, lidar_attenuation_pct, camera_glare_index, failure_type, av_disengagement` | California DMV Disengagement Reports & Fraunhofer Sensor Degradation Physics |
 
 ---
 

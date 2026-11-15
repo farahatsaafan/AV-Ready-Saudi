@@ -167,7 +167,7 @@ BEGIN
             WITH (
                 FIRSTROW = 2,
                 FIELDTERMINATOR = '','',
-                ROWTERMINATOR = ''\n'',
+                ROWTERMINATOR = ''0x0a'',
                 CODEPAGE = ''65001'',
                 TABLOCK
             );';
@@ -199,7 +199,7 @@ BEGIN
             WITH (
                 FIRSTROW = 2,
                 FIELDTERMINATOR = '','',
-                ROWTERMINATOR = ''\n'',
+                ROWTERMINATOR = ''0x0a'',
                 CODEPAGE = ''65001'',
                 TABLOCK
             );';
@@ -231,7 +231,7 @@ BEGIN
             WITH (
                 FIRSTROW = 2,
                 FIELDTERMINATOR = '','',
-                ROWTERMINATOR = ''\n'',
+                ROWTERMINATOR = ''0x0a'',
                 CODEPAGE = ''65001'',
                 TABLOCK
             );';

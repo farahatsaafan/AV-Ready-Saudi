@@ -6,6 +6,7 @@ link_content.html
 *.bin
 
 # Temporary & database files
+.env
 *.bak
 *.trn
 *.log
