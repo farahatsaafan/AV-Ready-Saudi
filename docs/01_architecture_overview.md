@@ -18,7 +18,7 @@ flowchart TD
     subgraph Data Engineering Pipeline
         S1["Saudi Weather Source (21,920 rows)"] --> B1["Bronze Landing (Untyped Raw)"]
         S2["Traffic Accidents (5,066 rows)"] --> B2["Bronze Landing (Untyped Raw)"]
-        S3["AV Telemetry & Failures (15,000 rows)"] --> B3["Bronze Landing (Untyped Raw)"]
+        S3["AV Telemetry & Failures (12,000 rows)"] --> B3["Bronze Landing (Untyped Raw)"]
         
         B1 & B2 & B3 -->|6 Verbs Cleansing & Deduping| SL["Silver Layer (Trusted & Typed)"]
         SL -->|Star Schema & Aggregations| GL["Gold Layer (Business Ready / Marts)"]

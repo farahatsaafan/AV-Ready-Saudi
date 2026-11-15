@@ -24,8 +24,8 @@
 | :--- | :--- | :---: | :---: | :--- |
 | `bronze.sa_weather` | `saudi_weather_daily_2019_2024.csv` | **21,920** | 16 + 2 Provenance | أرشيف Open-Meteo التاريخي (ERA5 / محطات الأرصاد السعودية NCM) |
 | `bronze.sa_traffic_accidents` | `saudi_traffic_accidents_2019_2024.csv` | **5,066** | 11 + 2 Provenance | الهيئة العامة للإحصاء (GASTAT) ووزارة النقل السعودية |
-| `bronze.av_telemetry` | `av_telemetry_failures_saudi.csv` | **15,000** | 14 + 2 Provenance | تقارير California DMV Disengagements ومعادلات Fraunhofer الفيزيائية |
-| **الإجمالي** | **3 مصادر أساسية** | **41,986** | — | — |
+| `bronze.av_telemetry` | `av_telemetry_failures_saudi.csv` | **12,000** | 14 + 2 Provenance | تقارير California DMV Disengagements ومعادلات Fraunhofer الفيزيائية (4000 لكل نمط عطل رئيسي) |
+| **الإجمالي** | **3 مصادر أساسية** | **38,986** | — | — |
 
 ---
 
@@ -46,6 +46,6 @@
 ---
 
 ## 5. حالة الجاهزية للطبقة الفضية
-* كافة الجداول الثلاثة محملة بنسبة 100% (41,986 صفاً).
+* كافة الجداول الثلاثة محملة بنسبة 100% (38,986 صفاً).
 * تم التحقق من سلامة الأعداد عبر جدول التدقيق `audit.load_log`.
 * البيانات جاهزة تماماً للانتقال إلى إجراء التنظيف والمطابقة `silver.load_silver`.

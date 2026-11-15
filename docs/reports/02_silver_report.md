@@ -36,7 +36,7 @@
 | :--- | :--- | :--- | :---: | :---: |
 | `silver.sa_weather` | `weather_key (INT IDENTITY)` | `date + city_id` | **21,920** | **0** |
 | `silver.sa_traffic_accidents` | `accident_key (INT IDENTITY)` | `accident_id` | **5,066** | **0** |
-| `silver.av_telemetry` | `telemetry_key (INT IDENTITY)` | `telemetry_id` | **15,000** | **0** |
+| `silver.av_telemetry` | `telemetry_key (INT IDENTITY)` | `telemetry_id` | **12,000** | **0** |
 | **`silver.reject_log`** | `reject_id (BIGINT IDENTITY)` | — | — | **0 مرفوضات** |
 
 ---
@@ -51,6 +51,6 @@ $$\text{Bronze Rows} = \text{Silver Rows} + \text{Quarantined Rejects} + \text{D
 2. **حوادث الطرق (Accidents):**
    $$5,066 \text{ (Bronze)} = 5,066 \text{ (Silver)} + 0 \text{ (Rejected)} + 0 \text{ (Duplicates)} \quad \checkmark \text{ [BALANCED]}$$
 3. **التيليمتري والأعطال (AV Telemetry):**
-   $$15,000 \text{ (Bronze)} = 15,000 \text{ (Silver)} + 0 \text{ (Rejected)} + 0 \text{ (Duplicates)} \quad \checkmark \text{ [BALANCED]}$$
+   $$12,000 \text{ (Bronze)} = 12,000 \text{ (Silver)} + 0 \text{ (Rejected)} + 0 \text{ (Duplicates)} \quad \checkmark \text{ [BALANCED]}$$
 
-* **النتيجة الإجمالية:** خط الأنابيب متوازن بنسبة **100.0%** بدون أي فقدان للبيانات، وجاهز للبناء البعدي في الطبقة الذهبية.
+* **النتيجة الإجمالية:** خط الأنابيب متوازن بنسبة **100.0%** (إجمالي 38,986 صفاً بنسبة موثوقية رسمية واقعية **69.2%**)، وجاهز للبناء البعدي في الطبقة الذهبية.

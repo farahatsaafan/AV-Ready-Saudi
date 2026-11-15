@@ -48,7 +48,7 @@
 
 ## 3. 🤖 بيانات القيادة الذاتية والأعطال (AV Disengagements & Telemetry)
 * **اسم الملفات:**
-  * `Data/av_telemetry_failures_saudi.csv` (15,000 صف)
+  * `Data/av_telemetry_failures_saudi.csv` (12,000 صف)
   * `Data/saudi_av_sensor_dust_storm_failures.csv` (6,000 صف)
   * `Data/saudi_av_thermal_overheat_failures.csv` (6,000 صف)
   * `Data/saudi_av_tire_pressure_blowout_failures.csv` (6,000 صف)

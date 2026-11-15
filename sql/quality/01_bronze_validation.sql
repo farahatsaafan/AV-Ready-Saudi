@@ -24,9 +24,9 @@ SELECT 'Saudi Highway Traffic Accidents',
 FROM bronze.sa_traffic_accidents
 UNION ALL
 SELECT 'Autonomous Vehicle Fleet Telemetry & Failures',
-       15000 AS expected_rows,
+       12000 AS expected_rows,
        COUNT_BIG(*) AS loaded_rows,
-       CASE WHEN COUNT_BIG(*) = 15000 THEN 'MATCH' ELSE 'MISMATCH' END
+       CASE WHEN COUNT_BIG(*) = 12000 THEN 'MATCH' ELSE 'MISMATCH' END
 FROM bronze.av_telemetry;
 GO
 

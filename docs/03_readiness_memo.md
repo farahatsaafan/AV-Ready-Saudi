@@ -34,7 +34,7 @@ As required by Unit 3 Lab 4, the data pipeline balance was mathematically proven
 $$\begin{aligned}
 \text{Weather: } 21,920 \text{ (Bronze)} &= 21,920 \text{ (Silver)} + 0 \text{ (Rejected)} + 0 \text{ (Duplicates)} \quad &\checkmark \text{ BALANCED} \\
 \text{Accidents: } 5,066 \text{ (Bronze)} &= 5,066 \text{ (Silver)} + 0 \text{ (Rejected)} + 0 \text{ (Duplicates)} \quad &\checkmark \text{ BALANCED} \\
-\text{Telemetry: } 15,000 \text{ (Bronze)} &= 15,000 \text{ (Silver)} + 0 \text{ (Rejected)} + 0 \text{ (Duplicates)} \quad &\checkmark \text{ BALANCED}
+\text{Telemetry: } 12,000 \text{ (Bronze)} &= 12,000 \text{ (Silver)} + 0 \text{ (Rejected)} + 0 \text{ (Duplicates)} \quad &\checkmark \text{ BALANCED}
 \end{aligned}$$
 
 ---
