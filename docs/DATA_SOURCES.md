@@ -35,6 +35,7 @@
    * *الشرح:* البوابة الوطنية الرسمية لحكومة المملكة للبيانات المفتوحة (تضم بيانات النقل والمرور والإحصاءات الحيوية).
 2. **رابط مستودع بيانات حوادث المرور والإصابات حسب المناطق (KAPSARC Data Portal - Saudi Traffic Accidents):**
    * [https://data.kapsarc.org/explore/dataset/saudi-arabia-traffic-accidents-and-casualties-injured-dead-2008/](https://data.kapsarc.org/explore/dataset/saudi-arabia-traffic-accidents-and-casualties-injured-dead-2008/)
+   * *رابط التنزيل المباشر الرسمي عبر API (Direct CSV Export):* [https://datasource.kapsarc.org/api/explore/v2.1/catalog/datasets/saudi-arabia-traffic-accidents-and-casualties-injured-dead-2008/exports/csv](https://datasource.kapsarc.org/api/explore/v2.1/catalog/datasets/saudi-arabia-traffic-accidents-and-casualties-injured-dead-2008/exports/csv)
    * *الشرح:* بوابة بيانات مركز الملك عبد الله للدراسات والبحوث (KAPSARC) الرسمية التي توفر التنزيل المباشر بصيغ CSV و JSON لمؤشرات الحوادث والإصابات والوفيات الصادرة عن الهيئة العامة للإحصاء (GASTAT).
 3. **الهيئة العامة للإحصاء بالمملكة العربية السعودية (GASTAT):**
    * [https://www.stats.gov.sa/](https://www.stats.gov.sa/)
