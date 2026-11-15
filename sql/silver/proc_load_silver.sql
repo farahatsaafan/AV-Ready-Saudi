@@ -2,7 +2,7 @@
 -- Project: AV-Ready-Saudi
 -- Script: proc_load_silver.sql
 -- Purpose: Automated transformation procedure to load trusted Silver tables.
--- Reference: Unit 3 Lab 4 (6 Verbs: Trim, Convert, Map, Dedupe, Validate, Reject)
+-- Reference: Unit 3 Lab 4 (6 Verbs: Trim, Standardize, Convert, Dedupe, Validate, Reject)
 -- Usage:   EXEC silver.load_silver;
 -- ==============================================================================
 
@@ -13,39 +13,42 @@ CREATE OR ALTER PROCEDURE silver.load_silver
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET XACT_ABORT ON; -- Any run-time error triggers automatic rollback
+    SET XACT_ABORT ON;
 
     DECLARE @batch_id UNIQUEIDENTIFIER = NEWID();
     DECLARE @start_time DATETIME2 = SYSDATETIME();
-    DECLARE @end_time DATETIME2;
+    DECLARE @step_start DATETIME2;
+    DECLARE @step_end DATETIME2;
     DECLARE @rows_weather BIGINT;
     DECLARE @rows_accidents BIGINT;
     DECLARE @rows_telemetry BIGINT;
     DECLARE @rows_rejected BIGINT;
 
-    PRINT '==================================================';
-    PRINT 'Starting Silver Transformation | Batch ID: ' + CAST(@batch_id AS NVARCHAR(50));
-    PRINT '==================================================';
+    PRINT '====================================================================';
+    PRINT 'Starting Silver Cleansing & Transformation Batch: ' + CAST(@batch_id AS NVARCHAR(50));
+    PRINT '====================================================================';
 
     BEGIN TRY
         BEGIN TRAN;
 
-        -- 1. Truncate Silver targets and quarantine reject log
+        -- ----------------------------------------------------------------------
+        -- Step 1: Truncate destination Silver tables and reject log
+        -- ----------------------------------------------------------------------
+        TRUNCATE TABLE silver.reject_log;
         TRUNCATE TABLE silver.sa_weather;
         TRUNCATE TABLE silver.sa_traffic_accidents;
         TRUNCATE TABLE silver.av_telemetry;
-        TRUNCATE TABLE silver.reject_log;
 
         -- ----------------------------------------------------------------------
-        -- 2. Transform Saudi Weather: Deduplicate, Type, Validate, Standardize
+        -- Step 2: Transform bronze.sa_weather -> silver.sa_weather & reject_log
         -- ----------------------------------------------------------------------
-        PRINT 'Transforming: bronze.sa_weather -> silver.sa_weather & reject_log';
+        SET @step_start = SYSDATETIME();
 
         ;WITH raw_weather_deduped AS (
             SELECT 
                 NULLIF(LTRIM(RTRIM([date])), '') AS date_clean,
                 UPPER(NULLIF(LTRIM(RTRIM(city_id)), '')) AS city_id_clean,
-                UPPER(NULLIF(LTRIM(RTRIM(city_name_en)), '')) AS city_name_en_clean,
+                NULLIF(LTRIM(RTRIM(city_name_en)), '') AS city_name_en_clean,
                 NULLIF(LTRIM(RTRIM(city_name_ar)), '') AS city_name_ar_clean,
                 NULLIF(LTRIM(RTRIM(latitude)), '') AS lat_clean,
                 NULLIF(LTRIM(RTRIM(longitude)), '') AS lon_clean,
@@ -55,13 +58,13 @@ BEGIN
                 NULLIF(LTRIM(RTRIM(precipitation_mm)), '') AS precip_clean,
                 NULLIF(LTRIM(RTRIM(wind_speed_max_kmh)), '') AS wind_speed_clean,
                 NULLIF(LTRIM(RTRIM(wind_gusts_max_kmh)), '') AS wind_gusts_clean,
-                NULLIF(LTRIM(RTRIM(solar_radiation_mj)), '') AS solar_rad_clean,
-                NULLIF(LTRIM(RTRIM(weather_code_wmo)), '') AS wmo_code_clean,
+                NULLIF(LTRIM(RTRIM(solar_radiation_mj)), '') AS solar_clean,
+                NULLIF(LTRIM(RTRIM(weather_code_wmo)), '') AS weather_code_clean,
                 NULLIF(LTRIM(RTRIM(is_dust_storm)), '') AS dust_clean,
                 NULLIF(LTRIM(RTRIM(is_extreme_heat)), '') AS heat_clean,
                 ROW_NUMBER() OVER (
-                    PARTITION BY UPPER(LTRIM(RTRIM(city_id))), LTRIM(RTRIM([date])) 
-                    ORDER BY LTRIM(RTRIM([date])) ASC
+                    PARTITION BY NULLIF(LTRIM(RTRIM([date])), ''), UPPER(NULLIF(LTRIM(RTRIM(city_id)), '')) 
+                    ORDER BY NULLIF(LTRIM(RTRIM([date])), '') ASC
                 ) AS rn
             FROM bronze.sa_weather
         ),
@@ -72,8 +75,8 @@ BEGIN
                 MONTH(TRY_CONVERT(DATE, date_clean)) AS weather_month,
                 DAY(TRY_CONVERT(DATE, date_clean)) AS weather_day,
                 city_id_clean AS city_id,
-                ISNULL(city_name_en_clean, 'UNKNOWN') AS city_name_en,
-                ISNULL(city_name_ar_clean, N'غير محدد') AS city_name_ar,
+                city_name_en_clean AS city_name_en,
+                city_name_ar_clean AS city_name_ar,
                 TRY_CONVERT(DECIMAL(10,6), lat_clean) AS latitude,
                 TRY_CONVERT(DECIMAL(10,6), lon_clean) AS longitude,
                 TRY_CONVERT(DECIMAL(5,2), temp_max_clean) AS temp_max_c,
@@ -82,20 +85,22 @@ BEGIN
                 TRY_CONVERT(DECIMAL(6,2), precip_clean) AS precipitation_mm,
                 TRY_CONVERT(DECIMAL(5,2), wind_speed_clean) AS wind_speed_max_kmh,
                 TRY_CONVERT(DECIMAL(5,2), wind_gusts_clean) AS wind_gusts_max_kmh,
-                TRY_CONVERT(DECIMAL(6,2), solar_rad_clean) AS solar_radiation_mj,
-                TRY_CONVERT(INT, wmo_code_clean) AS weather_code_wmo,
-                CASE WHEN UPPER(dust_clean) IN ('TRUE', '1') THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS is_dust_storm,
-                CASE WHEN UPPER(heat_clean) IN ('TRUE', '1') THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS is_extreme_heat,
-                -- 6 Verbs: Validate & Reject Reason Mapping
+                TRY_CONVERT(DECIMAL(6,2), solar_clean) AS solar_radiation_mj,
+                TRY_CONVERT(INT, weather_code_clean) AS weather_code_wmo,
                 CASE 
+                    WHEN LOWER(dust_clean) IN ('true', '1') THEN CAST(1 AS BIT)
+                    ELSE CAST(0 AS BIT)
+                END AS is_dust_storm,
+                CASE 
+                    WHEN LOWER(heat_clean) IN ('true', '1') THEN CAST(1 AS BIT)
+                    ELSE CAST(0 AS BIT)
+                END AS is_extreme_heat,
+                -- 6-Verbs Validation Gate
+                CASE 
+                    WHEN date_clean IS NULL OR TRY_CONVERT(DATE, date_clean) IS NULL THEN 'invalid or missing date'
                     WHEN city_id_clean IS NULL THEN 'missing city_id'
-                    WHEN date_clean IS NULL OR TRY_CONVERT(DATE, date_clean) IS NULL THEN 'invalid weather_date'
                     WHEN temp_max_clean IS NULL OR TRY_CONVERT(DECIMAL(5,2), temp_max_clean) IS NULL THEN 'invalid temp_max_c'
-                    WHEN TRY_CONVERT(DECIMAL(5,2), temp_max_clean) < -15.0 OR TRY_CONVERT(DECIMAL(5,2), temp_max_clean) > 65.0 THEN 'impossible temperature for Saudi Arabia'
-                    WHEN TRY_CONVERT(DECIMAL(10,6), lat_clean) NOT BETWEEN 15.0 AND 33.0 THEN 'latitude out of Saudi bounds'
-                    WHEN TRY_CONVERT(DECIMAL(10,6), lon_clean) NOT BETWEEN 34.0 AND 56.0 THEN 'longitude out of Saudi bounds'
-                    WHEN TRY_CONVERT(DECIMAL(6,2), precip_clean) < 0.0 THEN 'negative precipitation'
-                    WHEN TRY_CONVERT(DECIMAL(5,2), wind_speed_clean) < 0.0 THEN 'negative wind speed'
+                    WHEN TRY_CONVERT(DECIMAL(5,2), temp_max_clean) < -15.0 OR TRY_CONVERT(DECIMAL(5,2), temp_max_clean) > 65.0 THEN 'temp_max_c out of physical range (-15 to 65C)'
                     ELSE NULL
                 END AS reject_reason
             FROM raw_weather_deduped
@@ -103,13 +108,13 @@ BEGIN
         )
         SELECT * INTO #weather_stage FROM typed_weather;
 
-        -- Quarantine rejected weather records
+        -- Quarantine Rejects
         INSERT INTO silver.reject_log (source_table, business_key, reason)
-        SELECT 'bronze.sa_weather', ISNULL(city_id, 'NULL') + ':' + ISNULL(CONVERT(VARCHAR(20), weather_date), 'NULL'), reject_reason
+        SELECT 'bronze.sa_weather', ISNULL(city_id, 'UNKNOWN') + '_' + CONVERT(VARCHAR(20), ISNULL(weather_date, '1900-01-01')), reject_reason
         FROM #weather_stage
         WHERE reject_reason IS NOT NULL;
 
-        -- Insert clean accepted weather records
+        -- Load Clean Valid Rows
         INSERT INTO silver.sa_weather (
             weather_date, weather_year, weather_month, weather_day,
             city_id, city_name_en, city_name_ar, latitude, longitude,
@@ -127,11 +132,17 @@ BEGIN
         WHERE reject_reason IS NULL;
 
         DROP TABLE #weather_stage;
+        SELECT @rows_weather = COUNT_BIG(*) FROM silver.sa_weather;
+        SET @step_end = SYSDATETIME();
+
+        INSERT INTO audit.load_log (batch_id, source_name, target_table, start_time, end_time, rows_loaded, status, message)
+        VALUES (@batch_id, 'bronze.sa_weather', 'silver.sa_weather', @step_start, @step_end, @rows_weather, 'SUCCESS', 'Cleaned & loaded');
+        PRINT '  [SUCCESS] silver.sa_weather: ' + CAST(@rows_weather AS NVARCHAR(20)) + ' rows loaded.';
 
         -- ----------------------------------------------------------------------
-        -- 3. Transform Saudi Highway Traffic Accidents
+        -- Step 3: Transform bronze.sa_traffic_accidents -> silver.sa_traffic_accidents
         -- ----------------------------------------------------------------------
-        PRINT 'Transforming: bronze.sa_traffic_accidents -> silver.sa_traffic_accidents & reject_log';
+        SET @step_start = SYSDATETIME();
 
         ;WITH raw_accidents_deduped AS (
             SELECT 
@@ -147,8 +158,8 @@ BEGIN
                 NULLIF(LTRIM(RTRIM(ambient_temp_c)), '') AS temp_clean,
                 NULLIF(LTRIM(RTRIM(wind_gusts_kmh)), '') AS gusts_clean,
                 ROW_NUMBER() OVER (
-                    PARTITION BY UPPER(LTRIM(RTRIM(accident_id))) 
-                    ORDER BY LTRIM(RTRIM(accident_id)) ASC
+                    PARTITION BY UPPER(NULLIF(LTRIM(RTRIM(accident_id)), '')) 
+                    ORDER BY NULLIF(LTRIM(RTRIM(accident_id)), '') ASC
                 ) AS rn
             FROM bronze.sa_traffic_accidents
         ),
@@ -159,21 +170,21 @@ BEGIN
                 YEAR(TRY_CONVERT(DATE, date_clean)) AS accident_year,
                 MONTH(TRY_CONVERT(DATE, date_clean)) AS accident_month,
                 city_id_clean AS city_id,
-                ISNULL(road_name_clean, N'طريق عام') AS road_name,
-                ISNULL(severity_clean, 'MEDIUM') AS severity,
+                ISNULL(road_name_clean, N'National Highway') AS road_name,
+                ISNULL(severity_clean, 'MODERATE') AS severity,
                 ISNULL(primary_cause_clean, 'UNKNOWN') AS primary_cause,
                 TRY_CONVERT(INT, vehicles_clean) AS vehicles_involved,
                 TRY_CONVERT(INT, casualties_clean) AS casualties_count,
                 TRY_CONVERT(INT, weather_code_clean) AS weather_condition_code,
                 TRY_CONVERT(DECIMAL(5,2), temp_clean) AS ambient_temp_c,
                 TRY_CONVERT(DECIMAL(5,2), gusts_clean) AS wind_gusts_kmh,
-                -- 6 Verbs: Validate & Reject Reason Mapping
+                -- 6-Verbs Validation Gate
                 CASE 
                     WHEN accident_id_clean IS NULL THEN 'missing accident_id'
                     WHEN date_clean IS NULL OR TRY_CONVERT(DATE, date_clean) IS NULL THEN 'invalid accident_date'
                     WHEN city_id_clean IS NULL THEN 'missing city_id'
-                    WHEN vehicles_clean IS NULL OR TRY_CONVERT(INT, vehicles_clean) IS NULL OR TRY_CONVERT(INT, vehicles_clean) < 1 THEN 'invalid vehicles_involved (< 1)'
-                    WHEN casualties_clean IS NULL OR TRY_CONVERT(INT, casualties_clean) IS NULL OR TRY_CONVERT(INT, casualties_clean) < 0 THEN 'negative casualties_count'
+                    WHEN vehicles_clean IS NULL OR TRY_CONVERT(INT, vehicles_clean) < 1 THEN 'invalid vehicles_involved (< 1)'
+                    WHEN casualties_clean IS NULL OR TRY_CONVERT(INT, casualties_clean) < 0 THEN 'negative casualties_count'
                     ELSE NULL
                 END AS reject_reason
             FROM raw_accidents_deduped
@@ -182,7 +193,7 @@ BEGIN
         SELECT * INTO #accidents_stage FROM typed_accidents;
 
         INSERT INTO silver.reject_log (source_table, business_key, reason)
-        SELECT 'bronze.sa_traffic_accidents', ISNULL(accident_id, 'NULL'), reject_reason
+        SELECT 'bronze.sa_traffic_accidents', ISNULL(accident_id, 'UNKNOWN'), reject_reason
         FROM #accidents_stage
         WHERE reject_reason IS NOT NULL;
 
@@ -201,11 +212,17 @@ BEGIN
         WHERE reject_reason IS NULL;
 
         DROP TABLE #accidents_stage;
+        SELECT @rows_accidents = COUNT_BIG(*) FROM silver.sa_traffic_accidents;
+        SET @step_end = SYSDATETIME();
+
+        INSERT INTO audit.load_log (batch_id, source_name, target_table, start_time, end_time, rows_loaded, status, message)
+        VALUES (@batch_id, 'bronze.sa_traffic_accidents', 'silver.sa_traffic_accidents', @step_start, @step_end, @rows_accidents, 'SUCCESS', 'Cleaned & loaded');
+        PRINT '  [SUCCESS] silver.sa_traffic_accidents: ' + CAST(@rows_accidents AS NVARCHAR(20)) + ' rows loaded.';
 
         -- ----------------------------------------------------------------------
-        -- 4. Transform Autonomous Vehicle Fleet Telemetry
+        -- Step 4: Transform bronze.av_telemetry -> silver.av_telemetry
         -- ----------------------------------------------------------------------
-        PRINT 'Transforming: bronze.av_telemetry -> silver.av_telemetry & reject_log';
+        SET @step_start = SYSDATETIME();
 
         ;WITH raw_telemetry_deduped AS (
             SELECT 
@@ -224,8 +241,8 @@ BEGIN
                 UPPER(NULLIF(LTRIM(RTRIM(severity)), '')) AS severity_clean,
                 NULLIF(LTRIM(RTRIM(av_disengagement)), '') AS disengage_clean,
                 ROW_NUMBER() OVER (
-                    PARTITION BY UPPER(LTRIM(RTRIM(telemetry_id))) 
-                    ORDER BY LTRIM(RTRIM(telemetry_id)) ASC
+                    PARTITION BY UPPER(NULLIF(LTRIM(RTRIM(telemetry_id)), '')) 
+                    ORDER BY NULLIF(LTRIM(RTRIM(telemetry_id)), '') ASC
                 ) AS rn
             FROM bronze.av_telemetry
         ),
@@ -234,27 +251,31 @@ BEGIN
                 telemetry_id_clean AS telemetry_id,
                 TRY_CONVERT(DATE, date_clean) AS telemetry_date,
                 city_id_clean AS city_id,
-                vehicle_id_clean AS vehicle_id,
+                ISNULL(vehicle_id_clean, 'AV-SAUDI-001') AS vehicle_id,
                 TRY_CONVERT(DECIMAL(6,2), speed_clean) AS speed_kmh,
                 TRY_CONVERT(DECIMAL(5,2), bat_temp_clean) AS battery_temp_c,
                 TRY_CONVERT(DECIMAL(5,2), gpu_temp_clean) AS gpu_temp_c,
                 TRY_CONVERT(DECIMAL(5,2), tire_p_clean) AS tire_pressure_psi,
                 TRY_CONVERT(DECIMAL(5,2), lidar_clean) AS lidar_attenuation_pct,
                 TRY_CONVERT(DECIMAL(4,2), glare_clean) AS camera_glare_index,
-                CASE WHEN UPPER(fail_clean) IN ('TRUE', '1') THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS failure_occurred,
+                CASE 
+                    WHEN LOWER(fail_clean) IN ('true', '1') THEN CAST(1 AS BIT)
+                    ELSE CAST(0 AS BIT)
+                END AS failure_occurred,
                 ISNULL(fail_type_clean, 'NONE') AS failure_type,
                 ISNULL(severity_clean, 'NORMAL') AS severity,
-                CASE WHEN UPPER(disengage_clean) IN ('TRUE', '1') THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS av_disengagement,
-                -- 6 Verbs: Validate & Reject Reason Mapping
+                CASE 
+                    WHEN LOWER(disengage_clean) IN ('true', '1') THEN CAST(1 AS BIT)
+                    ELSE CAST(0 AS BIT)
+                END AS av_disengagement,
+                -- 6-Verbs Validation Gate
                 CASE 
                     WHEN telemetry_id_clean IS NULL THEN 'missing telemetry_id'
                     WHEN date_clean IS NULL OR TRY_CONVERT(DATE, date_clean) IS NULL THEN 'invalid telemetry_date'
-                    WHEN vehicle_id_clean IS NULL THEN 'missing vehicle_id'
                     WHEN city_id_clean IS NULL THEN 'missing city_id'
-                    WHEN speed_clean IS NULL OR TRY_CONVERT(DECIMAL(6,2), speed_clean) IS NULL OR TRY_CONVERT(DECIMAL(6,2), speed_clean) < 0.0 OR TRY_CONVERT(DECIMAL(6,2), speed_clean) > 250.0 THEN 'impossible vehicle speed'
-                    WHEN bat_temp_clean IS NULL OR TRY_CONVERT(DECIMAL(5,2), bat_temp_clean) < -20.0 OR TRY_CONVERT(DECIMAL(5,2), bat_temp_clean) > 100.0 THEN 'impossible battery temperature'
-                    WHEN tire_p_clean IS NULL OR TRY_CONVERT(DECIMAL(5,2), tire_p_clean) < 10.0 OR TRY_CONVERT(DECIMAL(5,2), tire_p_clean) > 80.0 THEN 'impossible tire pressure'
-                    WHEN lidar_clean IS NULL OR TRY_CONVERT(DECIMAL(5,2), lidar_clean) < 0.0 OR TRY_CONVERT(DECIMAL(5,2), lidar_clean) > 100.0 THEN 'invalid lidar attenuation percentage'
+                    WHEN speed_clean IS NULL OR TRY_CONVERT(DECIMAL(6,2), speed_clean) < 0.0 OR TRY_CONVERT(DECIMAL(6,2), speed_clean) > 250.0 THEN 'speed_kmh out of physical range (0 to 250)'
+                    WHEN bat_temp_clean IS NULL OR TRY_CONVERT(DECIMAL(5,2), bat_temp_clean) < -10.0 OR TRY_CONVERT(DECIMAL(5,2), bat_temp_clean) > 90.0 THEN 'battery_temp_c out of range (-10 to 90C)'
+                    WHEN gpu_temp_clean IS NULL OR TRY_CONVERT(DECIMAL(5,2), gpu_temp_clean) < 10.0 OR TRY_CONVERT(DECIMAL(5,2), gpu_temp_clean) > 115.0 THEN 'gpu_temp_c out of range (10 to 115C)'
                     ELSE NULL
                 END AS reject_reason
             FROM raw_telemetry_deduped
@@ -263,61 +284,56 @@ BEGIN
         SELECT * INTO #telemetry_stage FROM typed_telemetry;
 
         INSERT INTO silver.reject_log (source_table, business_key, reason)
-        SELECT 'bronze.av_telemetry', ISNULL(telemetry_id, 'NULL'), reject_reason
+        SELECT 'bronze.av_telemetry', ISNULL(telemetry_id, 'UNKNOWN'), reject_reason
         FROM #telemetry_stage
         WHERE reject_reason IS NOT NULL;
 
         INSERT INTO silver.av_telemetry (
             telemetry_id, telemetry_date, city_id, vehicle_id,
             speed_kmh, battery_temp_c, gpu_temp_c, tire_pressure_psi,
-            lidar_attenuation_pct, camera_glare_index,
-            failure_occurred, failure_type, severity, av_disengagement
+            lidar_attenuation_pct, camera_glare_index, failure_occurred,
+            failure_type, severity, av_disengagement
         )
         SELECT 
             telemetry_id, telemetry_date, city_id, vehicle_id,
             speed_kmh, battery_temp_c, gpu_temp_c, tire_pressure_psi,
-            lidar_attenuation_pct, camera_glare_index,
-            failure_occurred, failure_type, severity, av_disengagement
+            lidar_attenuation_pct, camera_glare_index, failure_occurred,
+            failure_type, severity, av_disengagement
         FROM #telemetry_stage
         WHERE reject_reason IS NULL;
 
         DROP TABLE #telemetry_stage;
-
-        COMMIT; -- All or nothing: commit transaction when all operations succeed
-
-        -- Count rows loaded into Silver
-        SELECT @rows_weather = COUNT_BIG(*) FROM silver.sa_weather;
-        SELECT @rows_accidents = COUNT_BIG(*) FROM silver.sa_traffic_accidents;
         SELECT @rows_telemetry = COUNT_BIG(*) FROM silver.av_telemetry;
-        SELECT @rows_rejected = COUNT_BIG(*) FROM silver.reject_log;
-        SET @end_time = SYSDATETIME();
+        SET @step_end = SYSDATETIME();
 
-        -- Log successful Silver load into audit log
         INSERT INTO audit.load_log (batch_id, source_name, target_table, start_time, end_time, rows_loaded, status, message)
-        VALUES 
-            (@batch_id, 'bronze.sa_weather', 'silver.sa_weather', @start_time, @end_time, @rows_weather, 'SUCCESS', 'Silver weather cleaning, typing, deduplication complete'),
-            (@batch_id, 'bronze.sa_traffic_accidents', 'silver.sa_traffic_accidents', @start_time, @end_time, @rows_accidents, 'SUCCESS', 'Silver accidents cleaning and validation complete'),
-            (@batch_id, 'bronze.av_telemetry', 'silver.av_telemetry', @start_time, @end_time, @rows_telemetry, 'SUCCESS', 'Silver AV telemetry validation & failure mapping complete');
+        VALUES (@batch_id, 'bronze.av_telemetry', 'silver.av_telemetry', @step_start, @step_end, @rows_telemetry, 'SUCCESS', 'Cleaned & loaded');
+        PRINT '  [SUCCESS] silver.av_telemetry: ' + CAST(@rows_telemetry AS NVARCHAR(20)) + ' rows loaded.';
 
-        PRINT '==================================================';
+        -- Commit transaction
+        COMMIT;
+
+        SELECT @rows_rejected = COUNT_BIG(*) FROM silver.reject_log;
+        PRINT '====================================================================';
         PRINT 'Silver Transformation Finished Successfully!';
-        PRINT 'Weather Clean Rows Loaded: ' + CAST(@rows_weather AS NVARCHAR(20));
-        PRINT 'Accidents Clean Rows Loaded: ' + CAST(@rows_accidents AS NVARCHAR(20));
-        PRINT 'Telemetry Clean Rows Loaded: ' + CAST(@rows_telemetry AS NVARCHAR(20));
-        PRINT 'Quarantined Rejections Logged: ' + CAST(@rows_rejected AS NVARCHAR(20));
-        PRINT '==================================================';
+        PRINT 'Weather Rows:    ' + CAST(@rows_weather AS NVARCHAR(20));
+        PRINT 'Accident Rows:   ' + CAST(@rows_accidents AS NVARCHAR(20));
+        PRINT 'Telemetry Rows:  ' + CAST(@rows_telemetry AS NVARCHAR(20));
+        PRINT 'Rejected Rows:   ' + CAST(@rows_rejected AS NVARCHAR(20));
+        PRINT 'Total Batch Time: ' + CAST(DATEDIFF(SECOND, @start_time, SYSDATETIME()) AS NVARCHAR(10)) + 's';
+        PRINT '====================================================================';
 
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0 
-            ROLLBACK; -- Undo half-done work on runtime failure
-
-        SET @end_time = SYSDATETIME();
+        IF @@TRANCOUNT > 0 ROLLBACK;
+        SET @step_end = SYSDATETIME();
 
         INSERT INTO audit.load_log (batch_id, source_name, target_table, start_time, end_time, rows_loaded, status, message)
-        VALUES (@batch_id, 'bronze.*', 'silver.*', @start_time, @end_time, NULL, 'FAILED', ERROR_MESSAGE());
+        VALUES (@batch_id, 'bronze.*', 'silver.*', @start_time, @step_end, 0, 'FAILED', ERROR_MESSAGE());
 
+        PRINT '====================================================================';
         PRINT 'ERROR in silver.load_silver: ' + ERROR_MESSAGE();
+        PRINT '====================================================================';
         THROW;
     END CATCH;
 END;
