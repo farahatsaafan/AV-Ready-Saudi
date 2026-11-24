@@ -16,8 +16,20 @@ cd "$(dirname "$0")"
 
 C="${CONTAINER:-sql2022}"
 PW="${SA_PASSWORD:?set SA_PASSWORD first, e.g. SA_PASSWORD='...' bash run_pipeline_mac.sh}"
-PY="${PYTHON:-python3}"
-[ -x .venv/bin/python ] && PY=.venv/bin/python
+case "$PW" in "..."|"your-sa-password"|"") echo "SA_PASSWORD is still the placeholder - use the real sa password of your container."; exit 1;; esac
+
+# Python environment: the landing step needs openpyxl, the reference step pandas + numpy.
+# Created once in ./.venv so the system Python is never touched.
+if [ ! -x .venv/bin/python ]; then
+  echo ">>> Creating .venv (first run only)"
+  "${PYTHON:-python3}" -m venv .venv
+fi
+PY=.venv/bin/python
+if ! "$PY" -c "import openpyxl, pandas, numpy" 2>/dev/null; then
+  echo ">>> Installing openpyxl, pandas, numpy into .venv"
+  "$PY" -m pip install --quiet --upgrade pip
+  "$PY" -m pip install --quiet openpyxl pandas numpy
+fi
 
 [ -d Data/raw ] || { echo "Missing Data/raw (see docs/DATA_SOURCES.md)"; exit 1; }
 docker ps --format '{{.Names}}' | grep -qx "$C" || { echo "Container '$C' is not running. Start Docker Desktop and the container first."; exit 1; }
