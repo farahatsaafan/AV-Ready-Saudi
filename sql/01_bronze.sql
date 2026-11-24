@@ -1,267 +1,234 @@
 -- ==============================================================================
--- Project: AV-Ready-Saudi
--- Script: 01_bronze.sql
--- Purpose: Create Bronze landing tables, provenance columns, load views, and
---          the automated batch ingestion stored procedure bronze.load_bronze.
--- Principles (Course Skeleton Fall 2026):
---   1. Preserve source data exactly as received (all raw columns are text).
---   2. No silent cleaning in Bronze; keep defects for traceable Silver quarantine.
---   3. Provenance: track source_file and ingested_at timestamp for every row.
---   4. Load views allow BULK INSERT while provenance columns keep defaults.
+-- Project : AV-Ready-Saudi
+-- Script  : 01_bronze.sql
+-- Purpose : Bronze = raw landing. One table per source family, every value kept
+--           exactly as received (text). Provenance on every row.
+--
+-- Sources (all real, none generated):
+--   1. bronze.noaa_hourly        NOAA NCEI Global Hourly (ISD) - 13 Saudi stations
+--                                (one per region) + 4 US analog stations, 2021-2025
+--   2. bronze.gastat_cells       GASTAT transport statistics workbooks 2022-2025,
+--                                one row per Excel cell (formulas kept as text)
+--   3. bronze.dmv_disengagements California DMV AV disengagement reports 2021-2024
+--   4. bronze.dmv_mileage        California DMV AV mileage reports 2021-2024
+--   5. bronze.nhtsa_sgo_ads      NHTSA Standing General Order ADS crash reports
+--
+-- Input: Data/landing/*.tsv produced by python/00_land_raw.py (container format
+-- only - see that script). Columns shared by all files of a source are real
+-- columns; every other column is kept, with its original header, in a JSON text
+-- column so nothing is dropped.
+--
+-- Rules followed (Lecture 02 / Lab 3):
+--   * preserve source values, permissive text schema, no silent corrections
+--   * full-load pattern: TRUNCATE then reload the complete extract
+--   * batch metadata: load_batch_id, source_file, source_row_num, ingested_at
 -- ==============================================================================
 
 USE av_ready_saudi_dw;
 GO
 
 -- ------------------------------------------------------------------------------
--- 1. Source: Saudi Daily Meteorological Observations (saudi_weather_daily_2019_2024.csv)
+-- 1. NOAA Global Hourly observations
 -- ------------------------------------------------------------------------------
-DROP VIEW IF EXISTS bronze.v_sa_weather_load;
-DROP TABLE IF EXISTS bronze.sa_weather;
+DROP VIEW  IF EXISTS bronze.v_noaa_hourly_load;
+DROP TABLE IF EXISTS bronze.noaa_hourly;
 GO
-
-CREATE TABLE bronze.sa_weather (
-    [date]                VARCHAR(50)   NULL,
-    temp_max_c            VARCHAR(50)   NULL,
-    temp_min_c            VARCHAR(50)   NULL,
-    temp_mean_c           VARCHAR(50)   NULL,
-    precipitation_mm      VARCHAR(50)   NULL,
-    wind_speed_max_kmh    VARCHAR(50)   NULL,
-    wind_gusts_max_kmh    VARCHAR(50)   NULL,
-    solar_radiation_mj    VARCHAR(50)   NULL,
-    weather_code_wmo      VARCHAR(50)   NULL,
-    city_id               VARCHAR(50)   NULL,
-    city_name_en          VARCHAR(100)  NULL,
-    city_name_ar          NVARCHAR(100) NULL,
-    latitude              VARCHAR(50)   NULL,
-    longitude             VARCHAR(50)   NULL,
-    is_dust_storm         VARCHAR(50)   NULL,
-    is_extreme_heat       VARCHAR(50)   NULL,
-    -- Provenance columns (Course Standard)
-    source_file           VARCHAR(500)  NULL,
-    ingested_at           DATETIME2     NOT NULL DEFAULT SYSDATETIME()
+CREATE TABLE bronze.noaa_hourly (
+    source_file      NVARCHAR(400)  NULL,
+    source_row_num   NVARCHAR(20)   NULL,
+    [STATION]        NVARCHAR(50)   NULL,
+    [DATE]           NVARCHAR(50)   NULL,
+    [SOURCE]         NVARCHAR(20)   NULL,
+    [LATITUDE]       NVARCHAR(50)   NULL,
+    [LONGITUDE]      NVARCHAR(50)   NULL,
+    [ELEVATION]      NVARCHAR(50)   NULL,
+    [NAME]           NVARCHAR(200)  NULL,
+    [REPORT_TYPE]    NVARCHAR(20)   NULL,
+    [CALL_SIGN]      NVARCHAR(20)   NULL,
+    [QUALITY_CONTROL] NVARCHAR(20)  NULL,
+    [WND]            NVARCHAR(50)   NULL,
+    [CIG]            NVARCHAR(50)   NULL,
+    [VIS]            NVARCHAR(50)   NULL,
+    [TMP]            NVARCHAR(50)   NULL,
+    [DEW]            NVARCHAR(50)   NULL,
+    [SLP]            NVARCHAR(50)   NULL,
+    [AA1]            NVARCHAR(50)   NULL,
+    [MW1]            NVARCHAR(50)   NULL,
+    [AW1]            NVARCHAR(50)   NULL,
+    [AU1]            NVARCHAR(50)   NULL,
+    extra_json       NVARCHAR(MAX)  NULL,
+    load_batch_id    UNIQUEIDENTIFIER NULL,
+    ingested_at      DATETIME2      NOT NULL DEFAULT SYSDATETIME()
 );
 GO
-
--- BULK INSERT loads into this view so provenance columns keep their defaults
-CREATE OR ALTER VIEW bronze.v_sa_weather_load AS
-SELECT 
-    [date], temp_max_c, temp_min_c, temp_mean_c, precipitation_mm,
-    wind_speed_max_kmh, wind_gusts_max_kmh, solar_radiation_mj,
-    weather_code_wmo, city_id, city_name_en, city_name_ar,
-    latitude, longitude, is_dust_storm, is_extreme_heat
-FROM bronze.sa_weather;
+CREATE VIEW bronze.v_noaa_hourly_load AS
+SELECT source_file, source_row_num, [STATION], [DATE], [SOURCE], [LATITUDE], [LONGITUDE],
+       [ELEVATION], [NAME], [REPORT_TYPE], [CALL_SIGN], [QUALITY_CONTROL], [WND], [CIG],
+       [VIS], [TMP], [DEW], [SLP], [AA1], [MW1], [AW1], [AU1], extra_json
+FROM bronze.noaa_hourly;
 GO
 
 -- ------------------------------------------------------------------------------
--- 2. Source: Saudi Highway Traffic Accidents (saudi_traffic_accidents_2019_2024.csv)
+-- 2. GASTAT workbooks, one row per non-empty cell
 -- ------------------------------------------------------------------------------
-DROP VIEW IF EXISTS bronze.v_sa_traffic_accidents_load;
-DROP TABLE IF EXISTS bronze.sa_traffic_accidents;
+DROP VIEW  IF EXISTS bronze.v_gastat_cells_load;
+DROP TABLE IF EXISTS bronze.gastat_cells;
 GO
-
-CREATE TABLE bronze.sa_traffic_accidents (
-    accident_id            VARCHAR(50)   NULL,
-    [date]                 VARCHAR(50)   NULL,
-    city_id                VARCHAR(50)   NULL,
-    road_name              NVARCHAR(150) NULL,
-    severity               VARCHAR(50)   NULL,
-    primary_cause          VARCHAR(100)  NULL,
-    vehicles_involved      VARCHAR(50)   NULL,
-    casualties_count       VARCHAR(50)   NULL,
-    weather_condition_code VARCHAR(50)   NULL,
-    ambient_temp_c         VARCHAR(50)   NULL,
-    wind_gusts_kmh         VARCHAR(50)   NULL,
-    -- Provenance columns (Course Standard)
-    source_file            VARCHAR(500)  NULL,
-    ingested_at            DATETIME2     NOT NULL DEFAULT SYSDATETIME()
+CREATE TABLE bronze.gastat_cells (
+    source_file    NVARCHAR(400)  NULL,
+    sheet_name     NVARCHAR(100)  NULL,
+    row_num        NVARCHAR(20)   NULL,
+    col_num        NVARCHAR(20)   NULL,
+    cell_value     NVARCHAR(MAX)  NULL,
+    load_batch_id  UNIQUEIDENTIFIER NULL,
+    ingested_at    DATETIME2      NOT NULL DEFAULT SYSDATETIME()
 );
 GO
-
-CREATE OR ALTER VIEW bronze.v_sa_traffic_accidents_load AS
-SELECT 
-    accident_id, [date], city_id, road_name, severity, primary_cause,
-    vehicles_involved, casualties_count, weather_condition_code,
-    ambient_temp_c, wind_gusts_kmh
-FROM bronze.sa_traffic_accidents;
+CREATE VIEW bronze.v_gastat_cells_load AS
+SELECT source_file, sheet_name, row_num, col_num, cell_value FROM bronze.gastat_cells;
 GO
 
 -- ------------------------------------------------------------------------------
--- 3. Source: Autonomous Vehicle Fleet Telemetry (av_telemetry_failures_saudi.csv)
+-- 3. California DMV disengagement reports
 -- ------------------------------------------------------------------------------
-DROP VIEW IF EXISTS bronze.v_av_telemetry_load;
-DROP TABLE IF EXISTS bronze.av_telemetry;
+DROP VIEW  IF EXISTS bronze.v_dmv_disengagements_load;
+DROP TABLE IF EXISTS bronze.dmv_disengagements;
 GO
-
-CREATE TABLE bronze.av_telemetry (
-    telemetry_id          VARCHAR(50)   NULL,
-    [date]                VARCHAR(50)   NULL,
-    city_id               VARCHAR(50)   NULL,
-    vehicle_id            VARCHAR(50)   NULL,
-    speed_kmh             VARCHAR(50)   NULL,
-    battery_temp_c        VARCHAR(50)   NULL,
-    gpu_temp_c            VARCHAR(50)   NULL,
-    tire_pressure_psi     VARCHAR(50)   NULL,
-    lidar_attenuation_pct VARCHAR(50)   NULL,
-    camera_glare_index    VARCHAR(50)   NULL,
-    failure_occurred      VARCHAR(50)   NULL,
-    failure_type          VARCHAR(100)  NULL,
-    severity              VARCHAR(50)   NULL,
-    av_disengagement      VARCHAR(50)   NULL,
-    -- Provenance columns (Course Standard)
-    source_file           VARCHAR(500)  NULL,
-    ingested_at           DATETIME2     NOT NULL DEFAULT SYSDATETIME()
+CREATE TABLE bronze.dmv_disengagements (
+    source_file            NVARCHAR(400)  NULL,
+    source_row_num         NVARCHAR(20)   NULL,
+    manufacturer           NVARCHAR(400)  NULL,
+    permit_number          NVARCHAR(100)  NULL,
+    date_raw               NVARCHAR(100)  NULL,
+    vin                    NVARCHAR(100)  NULL,
+    capable_without_driver NVARCHAR(100)  NULL,
+    driver_present         NVARCHAR(100)  NULL,
+    initiated_by           NVARCHAR(200)  NULL,
+    location               NVARCHAR(200)  NULL,
+    description            NVARCHAR(MAX)  NULL,
+    extra_json             NVARCHAR(MAX)  NULL,
+    load_batch_id          UNIQUEIDENTIFIER NULL,
+    ingested_at            DATETIME2      NOT NULL DEFAULT SYSDATETIME()
 );
 GO
-
-CREATE OR ALTER VIEW bronze.v_av_telemetry_load AS
-SELECT 
-    telemetry_id, [date], city_id, vehicle_id, speed_kmh,
-    battery_temp_c, gpu_temp_c, tire_pressure_psi, lidar_attenuation_pct,
-    camera_glare_index, failure_occurred, failure_type, severity,
-    av_disengagement
-FROM bronze.av_telemetry;
-GO
-
-PRINT 'Bronze tables and load views created successfully.';
+CREATE VIEW bronze.v_dmv_disengagements_load AS
+SELECT source_file, source_row_num, manufacturer, permit_number, date_raw, vin,
+       capable_without_driver, driver_present, initiated_by, location, description, extra_json
+FROM bronze.dmv_disengagements;
 GO
 
 -- ------------------------------------------------------------------------------
--- 4. Stored Procedure: bronze.load_bronze
--- Usage: EXEC bronze.load_bronze @base_path = 'D:\AV-Ready-Saudi\Data';
+-- 4. California DMV mileage reports (month columns kept in months_json)
+-- ------------------------------------------------------------------------------
+DROP VIEW  IF EXISTS bronze.v_dmv_mileage_load;
+DROP TABLE IF EXISTS bronze.dmv_mileage;
+GO
+CREATE TABLE bronze.dmv_mileage (
+    source_file            NVARCHAR(400)  NULL,
+    source_row_num         NVARCHAR(20)   NULL,
+    manufacturer           NVARCHAR(400)  NULL,
+    permit_number          NVARCHAR(100)  NULL,
+    vin                    NVARCHAR(100)  NULL,
+    annual_disengagements  NVARCHAR(100)  NULL,
+    months_json            NVARCHAR(MAX)  NULL,
+    load_batch_id          UNIQUEIDENTIFIER NULL,
+    ingested_at            DATETIME2      NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+CREATE VIEW bronze.v_dmv_mileage_load AS
+SELECT source_file, source_row_num, manufacturer, permit_number, vin,
+       annual_disengagements, months_json
+FROM bronze.dmv_mileage;
+GO
+
+-- ------------------------------------------------------------------------------
+-- 5. NHTSA SGO ADS incident reports (archive 2021-2025 + current file)
+-- ------------------------------------------------------------------------------
+DROP VIEW  IF EXISTS bronze.v_nhtsa_sgo_ads_load;
+DROP TABLE IF EXISTS bronze.nhtsa_sgo_ads;
+GO
+CREATE TABLE bronze.nhtsa_sgo_ads (
+    source_file         NVARCHAR(400) NULL,
+    source_row_num      NVARCHAR(20)  NULL,
+    [Report ID]         NVARCHAR(100) NULL,
+    [Report Version]    NVARCHAR(20)  NULL,
+    [Reporting Entity]  NVARCHAR(200) NULL,
+    [Make]              NVARCHAR(200) NULL,
+    [Model]             NVARCHAR(200) NULL,
+    [Model Year]        NVARCHAR(50)  NULL,
+    [State]             NVARCHAR(50)  NULL,
+    [City]              NVARCHAR(200) NULL,
+    [Incident Date]     NVARCHAR(50)  NULL,
+    [Incident Time (24:00)] NVARCHAR(50) NULL,
+    [Roadway Type]      NVARCHAR(100) NULL,
+    [Posted Speed Limit (MPH)] NVARCHAR(50) NULL,
+    [Lighting]          NVARCHAR(100) NULL,
+    row_json            NVARCHAR(MAX) NULL,
+    load_batch_id       UNIQUEIDENTIFIER NULL,
+    ingested_at         DATETIME2     NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+CREATE VIEW bronze.v_nhtsa_sgo_ads_load AS
+SELECT source_file, source_row_num, [Report ID], [Report Version], [Reporting Entity], [Make],
+       [Model], [Model Year], [State], [City], [Incident Date], [Incident Time (24:00)],
+       [Roadway Type], [Posted Speed Limit (MPH)], [Lighting], row_json
+FROM bronze.nhtsa_sgo_ads;
+GO
+
+-- ------------------------------------------------------------------------------
+-- Load procedure
+-- Usage: EXEC bronze.load_bronze @landing_path = N'/tmp/av/landing';
 -- ------------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE bronze.load_bronze
-    @base_path NVARCHAR(500) = N'D:\AV-Ready-Saudi\Data'
+    @landing_path NVARCHAR(400) = N'/tmp/av/landing'
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET XACT_ABORT ON;
+    DECLARE @batch UNIQUEIDENTIFIER = NEWID();
+    DECLARE @i INT = 1, @n INT, @file NVARCHAR(200), @view NVARCHAR(200), @tbl NVARCHAR(200),
+            @src NVARCHAR(100), @sql NVARCHAR(MAX), @t0 DATETIME2, @rows BIGINT, @log BIGINT;
 
-    DECLARE @batch_id UNIQUEIDENTIFIER = NEWID();
-    DECLARE @start_time DATETIME2 = SYSDATETIME();
-    DECLARE @step_start DATETIME2;
-    DECLARE @step_end DATETIME2;
-    DECLARE @rows BIGINT;
-    DECLARE @sql NVARCHAR(MAX);
-    DECLARE @file_path NVARCHAR(600);
-    DECLARE @file_name VARCHAR(100);
+    DECLARE @plan TABLE (id INT IDENTITY(1,1), src NVARCHAR(100), file_name NVARCHAR(200),
+                         view_name NVARCHAR(200), table_name NVARCHAR(200));
+    INSERT INTO @plan (src, file_name, view_name, table_name) VALUES
+      (N'NOAA Global Hourly',     N'noaa_hourly.tsv',        N'bronze.v_noaa_hourly_load',        N'bronze.noaa_hourly'),
+      (N'GASTAT workbooks',       N'gastat_cells.tsv',       N'bronze.v_gastat_cells_load',       N'bronze.gastat_cells'),
+      (N'CA DMV disengagements',  N'dmv_disengagements.tsv', N'bronze.v_dmv_disengagements_load', N'bronze.dmv_disengagements'),
+      (N'CA DMV mileage',         N'dmv_mileage.tsv',        N'bronze.v_dmv_mileage_load',        N'bronze.dmv_mileage'),
+      (N'NHTSA SGO ADS',          N'nhtsa_sgo_ads.tsv',      N'bronze.v_nhtsa_sgo_ads_load',      N'bronze.nhtsa_sgo_ads');
+    SELECT @n = COUNT(*) FROM @plan;
 
-    PRINT '====================================================================';
-    PRINT 'Starting Bronze Ingestion Batch: ' + CAST(@batch_id AS NVARCHAR(50));
-    PRINT 'Base Path: ' + @base_path;
-    PRINT '====================================================================';
+    PRINT 'Bronze batch ' + CAST(@batch AS NVARCHAR(40));
+    WHILE @i <= @n
+    BEGIN
+        SELECT @src = src, @file = file_name, @view = view_name, @tbl = table_name FROM @plan WHERE id = @i;
+        SET @t0 = SYSDATETIME();
+        INSERT INTO audit.load_log (batch_id, layer, source_name, target_table, start_time, status)
+        VALUES (@batch, 'bronze', @src, @tbl, @t0, 'RUNNING');
+        SET @log = SCOPE_IDENTITY();
+        BEGIN TRY
+            SET @sql = N'TRUNCATE TABLE ' + @tbl + N';
+BULK INSERT ' + @view + N' FROM ''' + @landing_path + N'/' + @file + N'''
+WITH (FIRSTROW = 2, FIELDTERMINATOR = ''\t'', ROWTERMINATOR = ''0x0a'',
+      CODEPAGE = ''65001'', DATAFILETYPE = ''char'', TABLOCK);
+UPDATE ' + @tbl + N' SET load_batch_id = @b WHERE load_batch_id IS NULL;
+SELECT @r = COUNT_BIG(*) FROM ' + @tbl + N';';
+            EXEC sp_executesql @sql, N'@b UNIQUEIDENTIFIER, @r BIGINT OUTPUT', @b = @batch, @r = @rows OUTPUT;
+            UPDATE audit.load_log SET end_time = SYSDATETIME(), rows_loaded = @rows, status = 'SUCCESS'
+            WHERE load_id = @log;
+            PRINT CONCAT('  ', @tbl, ': ', @rows, ' rows');
+        END TRY
+        BEGIN CATCH
+            UPDATE audit.load_log SET end_time = SYSDATETIME(), status = 'FAILED',
+                   message = LEFT(ERROR_MESSAGE(), 2000)
+            WHERE load_id = @log;
+            PRINT CONCAT('  FAILED ', @tbl, ': ', ERROR_MESSAGE());
+            THROW;
+        END CATCH;
+        SET @i += 1;
+    END
+END
+GO
 
-    BEGIN TRY
-        -- ----------------------------------------------------------------------
-        -- Step 1: Ingest saudi_weather_daily_2019_2024.csv
-        -- ----------------------------------------------------------------------
-        SET @step_start = SYSDATETIME();
-        SET @file_name = 'saudi_weather_daily_2019_2024.csv';
-        SET @file_path = @base_path + '\' + @file_name;
-
-        TRUNCATE TABLE bronze.sa_weather;
-
-        SET @sql = N'
-            BULK INSERT bronze.v_sa_weather_load
-            FROM ''' + @file_path + '''
-            WITH (
-                FIRSTROW = 2,
-                FIELDTERMINATOR = '','',
-                ROWTERMINATOR = ''0x0a'',
-                CODEPAGE = ''65001'',
-                TABLOCK
-            );';
-        EXEC sp_executesql @sql;
-
-        UPDATE bronze.sa_weather 
-        SET source_file = @file_name 
-        WHERE source_file IS NULL;
-
-        SELECT @rows = COUNT_BIG(*) FROM bronze.sa_weather;
-        SET @step_end = SYSDATETIME();
-
-        INSERT INTO audit.load_log (batch_id, source_name, target_table, start_time, end_time, rows_loaded, status, message)
-        VALUES (@batch_id, @file_name, 'bronze.sa_weather', @step_start, @step_end, @rows, 'SUCCESS', 'Ingested successfully via view');
-        PRINT '  [SUCCESS] bronze.sa_weather loaded: ' + CAST(@rows AS NVARCHAR(20)) + ' rows.';
-
-        -- ----------------------------------------------------------------------
-        -- Step 2: Ingest saudi_traffic_accidents_2019_2024.csv
-        -- ----------------------------------------------------------------------
-        SET @step_start = SYSDATETIME();
-        SET @file_name = 'saudi_traffic_accidents_2019_2024.csv';
-        SET @file_path = @base_path + '\' + @file_name;
-
-        TRUNCATE TABLE bronze.sa_traffic_accidents;
-
-        SET @sql = N'
-            BULK INSERT bronze.v_sa_traffic_accidents_load
-            FROM ''' + @file_path + '''
-            WITH (
-                FIRSTROW = 2,
-                FIELDTERMINATOR = '','',
-                ROWTERMINATOR = ''0x0a'',
-                CODEPAGE = ''65001'',
-                TABLOCK
-            );';
-        EXEC sp_executesql @sql;
-
-        UPDATE bronze.sa_traffic_accidents 
-        SET source_file = @file_name 
-        WHERE source_file IS NULL;
-
-        SELECT @rows = COUNT_BIG(*) FROM bronze.sa_traffic_accidents;
-        SET @step_end = SYSDATETIME();
-
-        INSERT INTO audit.load_log (batch_id, source_name, target_table, start_time, end_time, rows_loaded, status, message)
-        VALUES (@batch_id, @file_name, 'bronze.sa_traffic_accidents', @step_start, @step_end, @rows, 'SUCCESS', 'Ingested successfully via view');
-        PRINT '  [SUCCESS] bronze.sa_traffic_accidents loaded: ' + CAST(@rows AS NVARCHAR(20)) + ' rows.';
-
-        -- ----------------------------------------------------------------------
-        -- Step 3: Ingest av_telemetry_failures_saudi.csv
-        -- ----------------------------------------------------------------------
-        SET @step_start = SYSDATETIME();
-        SET @file_name = 'av_telemetry_failures_saudi.csv';
-        SET @file_path = @base_path + '\' + @file_name;
-
-        TRUNCATE TABLE bronze.av_telemetry;
-
-        SET @sql = N'
-            BULK INSERT bronze.v_av_telemetry_load
-            FROM ''' + @file_path + '''
-            WITH (
-                FIRSTROW = 2,
-                FIELDTERMINATOR = '','',
-                ROWTERMINATOR = ''0x0a'',
-                CODEPAGE = ''65001'',
-                TABLOCK
-            );';
-        EXEC sp_executesql @sql;
-
-        UPDATE bronze.av_telemetry 
-        SET source_file = @file_name 
-        WHERE source_file IS NULL;
-
-        SELECT @rows = COUNT_BIG(*) FROM bronze.av_telemetry;
-        SET @step_end = SYSDATETIME();
-
-        INSERT INTO audit.load_log (batch_id, source_name, target_table, start_time, end_time, rows_loaded, status, message)
-        VALUES (@batch_id, @file_name, 'bronze.av_telemetry', @step_start, @step_end, @rows, 'SUCCESS', 'Ingested successfully via view');
-        PRINT '  [SUCCESS] bronze.av_telemetry loaded: ' + CAST(@rows AS NVARCHAR(20)) + ' rows.';
-
-        PRINT '====================================================================';
-        PRINT 'Bronze Ingestion Finished Successfully. Total Batch Time: ' + 
-              CAST(DATEDIFF(SECOND, @start_time, SYSDATETIME()) AS NVARCHAR(10)) + 's';
-        PRINT '====================================================================';
-    END TRY
-    BEGIN CATCH
-        SET @step_end = SYSDATETIME();
-        INSERT INTO audit.load_log (batch_id, source_name, target_table, start_time, end_time, rows_loaded, status, message)
-        VALUES (@batch_id, ISNULL(@file_name, 'UNKNOWN'), 'bronze.*', @start_time, @step_end, 0, 'FAILED', ERROR_MESSAGE());
-
-        PRINT '====================================================================';
-        PRINT 'ERROR in bronze.load_bronze: ' + ERROR_MESSAGE();
-        PRINT '====================================================================';
-        THROW;
-    END CATCH;
-END;
+PRINT 'Bronze objects created.';
 GO

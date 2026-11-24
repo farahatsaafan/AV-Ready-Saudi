@@ -1,320 +1,379 @@
 -- ==============================================================================
--- Project: AV-Ready-Saudi
--- Script: 03_gold.sql
--- Purpose: Create Gold dimensional Star Schema and materialization load procedure.
--- Course Standard: DM & DW Project Skeleton (Fall 2026)
+-- Project : AV-Ready-Saudi
+-- Script  : 03_gold.sql
+-- Purpose : Gold = ONE analytical table, gold.av_readiness_region_month
+--           (grain: one Saudi administrative region x one calendar month, 2021-2025).
+--           All aggregation happens here (Lab 3: "total by month and region" is Gold).
 --
--- Dimensional Model Structure:
---   - Dimensions: dim_city, dim_date, dim_weather_hazard, dim_av_failure_type
---   - Fact: fact_daily_av_risk
---   - MANDATORY RULE: State the GRAIN of every fact table first.
+-- How the three data families meet (relations, see docs/05_relations_and_lineage.md):
+--   Weather  -> Accidents : same region_code + same year      (both Saudi, observed)
+--   Weather  -> AV events : same condition vocabulary
+--                           (normal / rain / obscured = dust, haze, fog, visibility < 5 km;
+--                            day / night by sun position)
+--   AV crashes (NHTSA) and disengagements (DMV) are turned into relative risks per
+--   condition using US weather from the same places/dates as the exposure; the risks
+--   are then applied to each Saudi region-month's own mix of conditions.
+--
+-- Intermediate tables live in schema prep (allowed on the server); the schema gold
+-- holds exactly one table.
 -- ==============================================================================
 
 USE av_ready_saudi_dw;
 GO
 
--- ------------------------------------------------------------------------------
--- 1. Dimension: City Hubs (gold.dim_city)
--- ------------------------------------------------------------------------------
-DROP TABLE IF EXISTS gold.dim_city;
+DROP TABLE IF EXISTS prep.weather_station_hour;
+DROP TABLE IF EXISTS prep.weather_station_day;
+DROP TABLE IF EXISTS prep.saudi_region_month;
+DROP TABLE IF EXISTS prep.av_relative_risk;
+DROP TABLE IF EXISTS gold.av_readiness_region_month;
 GO
 
-CREATE TABLE gold.dim_city (
-    city_key       INT IDENTITY(1,1) PRIMARY KEY, -- Surrogate key
-    city_id        VARCHAR(10)       NOT NULL UNIQUE, -- Natural key
-    city_name_en   NVARCHAR(100)     NOT NULL,
-    city_name_ar   NVARCHAR(100)     NOT NULL,
-    latitude       DECIMAL(10,6)     NOT NULL,
-    longitude      DECIMAL(10,6)     NOT NULL,
-    climate_zone   VARCHAR(50)       NOT NULL
+-- one row per station per local clock hour (several reports per hour -> one hour)
+CREATE TABLE prep.weather_station_hour (
+    station_id   CHAR(11)     NOT NULL,
+    hour_local   DATETIME2(0) NOT NULL,
+    local_date   DATE         NOT NULL,
+    n_reports    INT          NOT NULL,
+    temp_c       DECIMAL(5,1) NULL,
+    temp_max_c   DECIMAL(5,1) NULL,
+    wind_max_ms  DECIMAL(5,1) NULL,
+    precip_mm    DECIMAL(6,1) NULL,
+    is_dust      BIT NOT NULL,
+    is_haze      BIT NOT NULL,
+    is_fog       BIT NOT NULL,
+    is_low_vis   BIT NOT NULL,
+    is_obscured  BIT NOT NULL,   -- dust OR haze OR fog OR visibility < 5 km
+    is_rain      BIT NOT NULL,
+    is_night     BIT NOT NULL,
+    hour_bucket  VARCHAR(10) NOT NULL,   -- obscured > rain > normal
+    PRIMARY KEY (station_id, hour_local)
+);
+
+-- one row per station per local day; day_type uses the same vocabulary
+CREATE TABLE prep.weather_station_day (
+    station_id      CHAR(11) NOT NULL,
+    local_date      DATE     NOT NULL,
+    hours_observed  INT      NOT NULL,
+    dust_hours      INT      NOT NULL,
+    obscured_hours  INT      NOT NULL,
+    rain_hours      INT      NOT NULL,
+    day_type        VARCHAR(10) NOT NULL, -- obscured (>=3 obscured hours) > rain (>=1 rain hour) > normal
+    PRIMARY KEY (station_id, local_date)
+);
+
+CREATE TABLE prep.saudi_region_month (
+    region_code     CHAR(3)  NOT NULL,
+    station_id      CHAR(11) NOT NULL,
+    month_start     DATE     NOT NULL,
+    hours_observed  INT, temp_mean_c DECIMAL(5,1), temp_max_c DECIMAL(5,1), wind_max_ms DECIMAL(5,1),
+    rain_mm DECIMAL(8,1),
+    dust_hours INT, haze_hours INT, fog_hours INT, low_vis_hours INT, obscured_hours INT,
+    rain_hours INT, normal_hours INT, night_hours INT,
+    days_observed INT, dust_days INT, obscured_days INT, rain_days INT, normal_days INT,
+    PRIMARY KEY (region_code, month_start)
+);
+
+-- relative risk of an AV event under each condition, compared with the reference level
+CREATE TABLE prep.av_relative_risk (
+    event_source    VARCHAR(20) NOT NULL,   -- nhtsa_crash / dmv_disengagement
+    factor          VARCHAR(10) NOT NULL,   -- weather / light
+    level           VARCHAR(10) NOT NULL,   -- normal, rain, obscured / day, night
+    events          INT         NOT NULL,
+    event_share     FLOAT       NULL,
+    exposure        FLOAT       NULL,       -- weighted hours (crash) or fleet miles (disengagement)
+    exposure_share  FLOAT       NULL,
+    relative_risk   FLOAT       NULL,       -- reference level (normal / day) = 1
+    used_in_index   BIT         NULL,       -- 1 only if the level has >= 30 events (evidence rule)
+    PRIMARY KEY (event_source, factor, level)
+);
+
+-- THE Gold table
+CREATE TABLE gold.av_readiness_region_month (
+    region_code                    CHAR(3)       NOT NULL,
+    region_name_en                 NVARCHAR(50)  NOT NULL,
+    region_name_ar                 NVARCHAR(50)  NOT NULL,
+    weather_station_id             CHAR(11)      NOT NULL,
+    [year]                         SMALLINT      NOT NULL,
+    [month]                        TINYINT       NOT NULL,
+    month_start                    DATE          NOT NULL,
+    season                         VARCHAR(6)    NOT NULL,
+    -- Saudi weather (NOAA hourly, observed)
+    wx_hours_observed              INT           NULL,
+    wx_hours_in_month              INT           NOT NULL,
+    wx_coverage_pct                DECIMAL(5,1)  NULL,
+    temp_mean_c                    DECIMAL(5,1)  NULL,
+    temp_max_c                     DECIMAL(5,1)  NULL,
+    wind_max_ms                    DECIMAL(5,1)  NULL,
+    rain_mm                        DECIMAL(8,1)  NULL,
+    share_dust_hours               DECIMAL(6,4)  NULL,
+    share_haze_hours               DECIMAL(6,4)  NULL,
+    share_fog_hours                DECIMAL(6,4)  NULL,
+    share_low_vis_hours            DECIMAL(6,4)  NULL,
+    share_obscured_hours           DECIMAL(6,4)  NULL,
+    share_rain_hours               DECIMAL(6,4)  NULL,
+    share_normal_hours             DECIMAL(6,4)  NULL,
+    share_night_hours              DECIMAL(6,4)  NULL,
+    days_observed                  INT           NULL,
+    dust_days                      INT           NULL,
+    obscured_days                  INT           NULL,
+    rain_days                      INT           NULL,
+    normal_days                    INT           NULL,
+    -- Saudi accidents (GASTAT, annual per region; same value on the 12 months of a year)
+    acc_year_serious               INT           NULL,
+    acc_year_deaths                INT           NULL,
+    acc_year_injuries              INT           NULL,
+    acc_year_serious_within_cities INT           NULL,
+    acc_year_serious_outside_cities INT          NULL,
+    acc_share_outside_cities       DECIMAL(6,4)  NULL,
+    acc_serious_month_avg          DECIMAL(9,2)  NULL,   -- annual / 12 (even split, not observed monthly)
+    -- AV side (NHTSA crashes + CA DMV disengagements & mileage + US analog weather)
+    av_rr_crash_rain               DECIMAL(9,4)  NULL,
+    av_rr_crash_obscured           DECIMAL(9,4)  NULL,
+    av_rr_crash_night              DECIMAL(9,4)  NULL,
+    av_rr_diseng_rain_day          DECIMAL(9,4)  NULL,
+    av_rr_diseng_obscured_day      DECIMAL(9,4)  NULL,
+    av_crash_risk_index            DECIMAL(9,4)  NULL,   -- 1 = month with only normal-weather hours
+    av_diseng_risk_index           DECIMAL(9,4)  NULL,   -- 1 = all-normal-days month
+    -- lineage
+    src_weather                    NVARCHAR(200) NOT NULL,
+    src_accidents                  NVARCHAR(400) NULL,
+    src_av                         NVARCHAR(200) NOT NULL,
+    gold_batch_id                  UNIQUEIDENTIFIER NOT NULL,
+    gold_loaded_at                 DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT PK_gold_region_month PRIMARY KEY (region_code, month_start)
 );
 GO
 
--- ------------------------------------------------------------------------------
--- 2. Dimension: Calendar Date (gold.dim_date)
--- ------------------------------------------------------------------------------
-DROP TABLE IF EXISTS gold.dim_date;
-GO
-
-CREATE TABLE gold.dim_date (
-    date_key       INT          PRIMARY KEY, -- Formatted YYYYMMDD
-    calendar_date  DATE         NOT NULL UNIQUE,
-    year_number    INT          NOT NULL,
-    month_number   INT          NOT NULL,
-    month_name     VARCHAR(20)  NOT NULL,
-    quarter_number INT          NOT NULL
-);
-GO
-
--- ------------------------------------------------------------------------------
--- 3. Dimension: Weather Sensor Hazard Taxonomy (gold.dim_weather_hazard)
--- ------------------------------------------------------------------------------
-DROP TABLE IF EXISTS gold.dim_weather_hazard;
-GO
-
-CREATE TABLE gold.dim_weather_hazard (
-    hazard_key          INT IDENTITY(1,1) PRIMARY KEY,
-    weather_code_wmo    INT               NOT NULL UNIQUE,
-    sensor_hazard_level NVARCHAR(20)      NOT NULL, -- 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
-    lidar_impact        NVARCHAR(150)     NOT NULL,
-    camera_impact       NVARCHAR(150)     NOT NULL
-);
-GO
-
--- ------------------------------------------------------------------------------
--- 4. Dimension: AV Component Failure Catalog (gold.dim_av_failure_type)
--- ------------------------------------------------------------------------------
-DROP TABLE IF EXISTS gold.dim_av_failure_type;
-GO
-
-CREATE TABLE gold.dim_av_failure_type (
-    failure_type_key INT IDENTITY(1,1) PRIMARY KEY,
-    failure_type     NVARCHAR(100)     NOT NULL UNIQUE,
-    subsystem        NVARCHAR(50)      NOT NULL, -- 'PERCEPTION_LIDAR', 'PERCEPTION_CAMERA', etc.
-    risk_level       NVARCHAR(20)      NOT NULL  -- 'NORMAL', 'MEDIUM', 'HIGH', 'CRITICAL'
-);
-GO
-
--- ------------------------------------------------------------------------------
--- 5. Fact Table: Daily City Driving Conditions & Sensor Risk
--- GRAIN: Exactly ONE row per city per observation date (date_key + city_key).
--- ------------------------------------------------------------------------------
-DROP TABLE IF EXISTS gold.fact_daily_av_risk;
-GO
-
-CREATE TABLE gold.fact_daily_av_risk (
-    fact_id                     BIGINT IDENTITY(1,1) PRIMARY KEY,
-    city_key                    INT            NOT NULL REFERENCES gold.dim_city(city_key),
-    date_key                    INT            NOT NULL REFERENCES gold.dim_date(date_key),
-    hazard_key                  INT            NOT NULL REFERENCES gold.dim_weather_hazard(hazard_key),
-    -- Observed Weather Measures
-    avg_temp_c                  DECIMAL(5,2)   NOT NULL,
-    max_temp_c                  DECIMAL(5,2)   NOT NULL,
-    max_wind_gusts_kmh          DECIMAL(5,2)   NOT NULL,
-    is_dust_storm               BIT            NOT NULL,
-    is_extreme_heat             BIT            NOT NULL,
-    -- Aggregated Traffic Incident Measures
-    daily_accident_count        INT            NOT NULL DEFAULT 0,
-    daily_casualties_count      INT            NOT NULL DEFAULT 0,
-    -- Aggregated AV Fleet Telemetry & Disengagement Measures
-    daily_av_trips_count        INT            NOT NULL DEFAULT 0,
-    daily_disengagements_count  INT            NOT NULL DEFAULT 0,
-    avg_lidar_attenuation_pct   DECIMAL(5,2)   NULL,
-    avg_camera_glare_index      DECIMAL(4,2)   NULL,
-    -- Synthesized Operational Readiness Score (0 to 100)
-    av_readiness_score          DECIMAL(5,2)   NOT NULL,
-    DW_create_date              DATETIME2      NOT NULL DEFAULT SYSDATETIME()
-);
-GO
-
-PRINT 'Gold tables [dim_city, dim_date, dim_weather_hazard, dim_av_failure_type, fact_daily_av_risk] created.';
-GO
-
--- ------------------------------------------------------------------------------
--- 6. Stored Procedure: gold.load_gold
--- Usage: EXEC gold.load_gold;
--- ------------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE gold.load_gold
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    DECLARE @batch_id UNIQUEIDENTIFIER = NEWID();
-    DECLARE @start_time DATETIME2 = SYSDATETIME();
-    DECLARE @end_time DATETIME2;
-    DECLARE @rows_facts BIGINT;
-
-    PRINT '====================================================================';
-    PRINT 'Starting Gold Dimensional Loading Batch: ' + CAST(@batch_id AS NVARCHAR(50));
-    PRINT '====================================================================';
+    DECLARE @batch UNIQUEIDENTIFIER = NEWID(), @t0 DATETIME2 = SYSDATETIME(), @rows BIGINT, @log BIGINT;
+    INSERT audit.load_log (batch_id, layer, source_name, target_table, start_time, status)
+    VALUES (@batch, 'gold', 'silver.*', 'gold.av_readiness_region_month', @t0, 'RUNNING');
+    SET @log = SCOPE_IDENTITY();
 
     BEGIN TRY
         BEGIN TRAN;
+        TRUNCATE TABLE prep.weather_station_hour;
+        TRUNCATE TABLE prep.weather_station_day;
+        TRUNCATE TABLE prep.saudi_region_month;
+        TRUNCATE TABLE prep.av_relative_risk;
+        TRUNCATE TABLE gold.av_readiness_region_month;
 
-        -- ----------------------------------------------------------------------
-        -- Step 0: Clear Fact Table before Dimensions
-        -- ----------------------------------------------------------------------
-        DELETE FROM gold.fact_daily_av_risk;
+        -------------------------------------------------- 1. station-hour
+        INSERT prep.weather_station_hour
+        SELECT station_id, h.hour_local, CAST(h.hour_local AS DATE), COUNT(*),
+               CAST(AVG(temp_c) AS DECIMAL(5,1)), MAX(temp_c), MAX(wind_ms), MAX(precip_1h_mm),
+               MAX(CAST(is_dust AS INT)), MAX(CAST(is_haze AS INT)), MAX(CAST(is_fog AS INT)),
+               MAX(CAST(is_low_vis AS INT)),
+               MAX(CASE WHEN is_dust = 1 OR is_haze = 1 OR is_fog = 1 OR is_low_vis = 1 THEN 1 ELSE 0 END),
+               MAX(CAST(is_rain AS INT)),
+               CASE WHEN AVG(CAST(is_night AS FLOAT)) >= 0.5 THEN 1 ELSE 0 END,
+               CASE WHEN MAX(CASE WHEN is_dust = 1 OR is_haze = 1 OR is_fog = 1 OR is_low_vis = 1 THEN 1 ELSE 0 END) = 1 THEN 'obscured'
+                    WHEN MAX(CAST(is_rain AS INT)) = 1 THEN 'rain' ELSE 'normal' END
+        FROM silver.weather_obs
+        CROSS APPLY (SELECT DATEADD(hour, DATEDIFF(hour, CAST('2000-01-01' AS DATETIME2(0)), obs_local),
+                                    CAST('2000-01-01' AS DATETIME2(0))) AS hour_local) h
+        GROUP BY station_id, h.hour_local;
 
-        -- ----------------------------------------------------------------------
-        -- Step 1: Refresh Dimensions
-        -- ----------------------------------------------------------------------
-        -- A) dim_city
-        DELETE FROM gold.dim_city;
-        INSERT INTO gold.dim_city (city_id, city_name_en, city_name_ar, latitude, longitude, climate_zone)
-        SELECT 
-            city_id,
-            MAX(city_name_en),
-            MAX(city_name_ar),
-            MAX(latitude),
-            MAX(longitude),
-            CASE 
-                WHEN city_id IN ('RUH', 'HAS', 'ULA') THEN 'DESERT_CONTINENTAL'
-                WHEN city_id IN ('JED', 'DMM')        THEN 'COASTAL_HUMID_DUST'
-                WHEN city_id IN ('MAK', 'MED')        THEN 'ARID_VALLEY_HEAT'
-                WHEN city_id IN ('ABH', 'TIF')        THEN 'HIGHLAND_TEMPERATE'
-                WHEN city_id = 'TBK'                  THEN 'NORTHERN_DESERT_PLATEAU'
-                ELSE 'DESERT_ARID'
-            END AS climate_zone
-        FROM silver.sa_weather
-        GROUP BY city_id;
+        -------------------------------------------------- 2. station-day
+        INSERT prep.weather_station_day
+        SELECT station_id, local_date, COUNT(*), SUM(CAST(is_dust AS INT)), SUM(CAST(is_obscured AS INT)),
+               SUM(CAST(is_rain AS INT)),
+               CASE WHEN SUM(CAST(is_obscured AS INT)) >= 3 THEN 'obscured'
+                    WHEN SUM(CAST(is_rain AS INT)) >= 1 THEN 'rain' ELSE 'normal' END
+        FROM prep.weather_station_hour
+        GROUP BY station_id, local_date;
 
-        -- B) dim_date
-        DELETE FROM gold.dim_date;
-        INSERT INTO gold.dim_date (date_key, calendar_date, year_number, month_number, month_name, quarter_number)
-        SELECT DISTINCT
-            CONVERT(INT, CONVERT(CHAR(8), weather_date, 112)) AS date_key,
-            weather_date AS calendar_date,
-            weather_year AS year_number,
-            weather_month AS month_number,
-            DATENAME(MONTH, weather_date) AS month_name,
-            DATEPART(QUARTER, weather_date) AS quarter_number
-        FROM silver.sa_weather;
-
-        -- C) dim_weather_hazard
-        DELETE FROM gold.dim_weather_hazard;
-        INSERT INTO gold.dim_weather_hazard (weather_code_wmo, sensor_hazard_level, lidar_impact, camera_impact)
-        SELECT DISTINCT
-            weather_code_wmo,
-            CASE 
-                WHEN weather_code_wmo IN (6, 7, 8, 9, 30, 31, 32, 33, 34, 35) THEN 'CRITICAL' -- Dust / Sandstorm
-                WHEN weather_code_wmo IN (40, 41, 42, 43, 44, 45, 46, 47, 48, 49) THEN 'CRITICAL' -- Fog
-                WHEN weather_code_wmo IN (95, 96, 97, 98, 99) THEN 'HIGH'                       -- Thunderstorm
-                WHEN weather_code_wmo IN (50, 51, 52, 53, 54, 55, 60, 61, 62, 63, 64, 65) THEN 'MEDIUM' -- Rain
-                WHEN weather_code_wmo IN (0, 1) THEN 'LOW'                                       -- Clear
-                ELSE 'LOW'
-            END AS sensor_hazard_level,
-            CASE 
-                WHEN weather_code_wmo IN (6, 7, 8, 9, 30, 31, 32, 33, 34, 35) THEN 'Severe particulate absorption (>70% attenuation)'
-                WHEN weather_code_wmo IN (45, 48) THEN 'Severe optical scattering under 50m'
-                WHEN weather_code_wmo >= 60 AND weather_code_wmo <= 65 THEN 'Ground droplet reflection and noise returns'
-                ELSE 'Nominal operational pulse range (>200m)'
-            END AS lidar_impact,
-            CASE 
-                WHEN weather_code_wmo IN (6, 7, 8, 9, 30, 31, 32, 33, 34, 35) THEN 'Total loss of lane contrast and optical occlusion'
-                WHEN weather_code_wmo = 0 THEN 'Potential solar glare blinding during midday low-angle sun'
-                WHEN weather_code_wmo IN (45, 48) THEN 'Severe contrast loss under dense atmospheric fog'
-                ELSE 'Nominal optical exposure'
-            END AS camera_impact
-        FROM silver.sa_weather;
-
-        -- D) dim_av_failure_type
-        DELETE FROM gold.dim_av_failure_type;
-        INSERT INTO gold.dim_av_failure_type (failure_type, subsystem, risk_level)
-        SELECT DISTINCT
-            failure_type,
-            CASE 
-                WHEN failure_type LIKE '%LIDAR%' THEN 'PERCEPTION_LIDAR'
-                WHEN failure_type LIKE '%CAMERA%' OR failure_type LIKE '%LANE%' THEN 'PERCEPTION_CAMERA'
-                WHEN failure_type LIKE '%BATTERY%' OR failure_type LIKE '%GPU%' THEN 'COMPUTE_HARDWARE'
-                WHEN failure_type LIKE '%TIRE%' THEN 'CHASSIS_TIRE'
-                ELSE 'GENERAL_SYSTEM'
-            END AS subsystem,
-            CASE 
-                WHEN failure_type = 'NONE' THEN 'NORMAL'
-                WHEN failure_type IN ('BATTERY_THERMAL_THROTTLING', 'LIDAR_DUST_OCCLUSION') THEN 'CRITICAL'
-                WHEN failure_type = 'CAMERA_SOLAR_BLINDING' THEN 'HIGH'
-                ELSE 'MEDIUM'
-            END AS risk_level
-        FROM silver.av_telemetry;
-
-        -- ----------------------------------------------------------------------
-        -- Step 2: Populate Fact Table (gold.fact_daily_av_risk)
-        -- GRAIN: One row per city per observation date
-        -- ----------------------------------------------------------------------
-        TRUNCATE TABLE gold.fact_daily_av_risk;
-
-        -- Pre-aggregate Accidents by city and date
-        ;WITH acc_agg AS (
-            SELECT 
-                city_id,
-                accident_date,
-                COUNT(*) AS accident_count,
-                SUM(casualties_count) AS casualties_count
-            FROM silver.sa_traffic_accidents
-            GROUP BY city_id, accident_date
-        ),
-        -- Pre-aggregate Telemetry by city and date
-        tel_agg AS (
-            SELECT 
-                city_id,
-                telemetry_date,
-                COUNT(*) AS trips_count,
-                SUM(CASE WHEN av_disengagement = 1 THEN 1 ELSE 0 END) AS disengagements_count,
-                ROUND(AVG(lidar_attenuation_pct), 2) AS avg_lidar_attenuation,
-                ROUND(AVG(camera_glare_index), 2) AS avg_camera_glare
-            FROM silver.av_telemetry
-            GROUP BY city_id, telemetry_date
+        -------------------------------------------------- 3. Saudi region-month
+        ;WITH hm AS (
+            SELECT s.region_code, s.station_id, DATEFROMPARTS(YEAR(h.local_date), MONTH(h.local_date), 1) AS month_start,
+                   COUNT(*) AS hours_observed, CAST(AVG(h.temp_c) AS DECIMAL(5,1)) AS temp_mean_c,
+                   MAX(h.temp_max_c) AS temp_max_c, MAX(h.wind_max_ms) AS wind_max_ms, SUM(h.precip_mm) AS rain_mm,
+                   SUM(CAST(h.is_dust AS INT)) AS dust_hours, SUM(CAST(h.is_haze AS INT)) AS haze_hours,
+                   SUM(CAST(h.is_fog AS INT)) AS fog_hours, SUM(CAST(h.is_low_vis AS INT)) AS low_vis_hours,
+                   SUM(CAST(h.is_obscured AS INT)) AS obscured_hours,
+                   SUM(CASE WHEN h.hour_bucket = 'rain' THEN 1 ELSE 0 END) AS rain_hours,
+                   SUM(CASE WHEN h.hour_bucket = 'normal' THEN 1 ELSE 0 END) AS normal_hours,
+                   SUM(CAST(h.is_night AS INT)) AS night_hours
+            FROM prep.weather_station_hour h
+            JOIN silver.dim_station s ON s.station_id = h.station_id AND s.country = 'SA'
+            GROUP BY s.region_code, s.station_id, DATEFROMPARTS(YEAR(h.local_date), MONTH(h.local_date), 1)
+        ), dm AS (
+            SELECT d.station_id, DATEFROMPARTS(YEAR(d.local_date), MONTH(d.local_date), 1) AS month_start,
+                   COUNT(*) AS days_observed,
+                   SUM(CASE WHEN d.dust_hours > 0 THEN 1 ELSE 0 END) AS dust_days,
+                   SUM(CASE WHEN d.day_type = 'obscured' THEN 1 ELSE 0 END) AS obscured_days,
+                   SUM(CASE WHEN d.day_type = 'rain' THEN 1 ELSE 0 END) AS rain_days,
+                   SUM(CASE WHEN d.day_type = 'normal' THEN 1 ELSE 0 END) AS normal_days
+            FROM prep.weather_station_day d
+            GROUP BY d.station_id, DATEFROMPARTS(YEAR(d.local_date), MONTH(d.local_date), 1)
         )
-        INSERT INTO gold.fact_daily_av_risk (
-            city_key, date_key, hazard_key,
-            avg_temp_c, max_temp_c, max_wind_gusts_kmh,
-            is_dust_storm, is_extreme_heat,
-            daily_accident_count, daily_casualties_count,
-            daily_av_trips_count, daily_disengagements_count,
-            avg_lidar_attenuation_pct, avg_camera_glare_index,
-            av_readiness_score
-        )
-        SELECT 
-            c.city_key,
-            d.date_key,
-            h.hazard_key,
-            w.temp_mean_c,
-            w.temp_max_c,
-            w.wind_gusts_max_kmh,
-            w.is_dust_storm,
-            w.is_extreme_heat,
-            ISNULL(a.accident_count, 0) AS daily_accident_count,
-            ISNULL(a.casualties_count, 0) AS daily_casualties_count,
-            ISNULL(t.trips_count, 0) AS daily_av_trips_count,
-            ISNULL(t.disengagements_count, 0) AS daily_disengagements_count,
-            t.avg_lidar_attenuation,
-            t.avg_camera_glare,
-            -- Synthesized Composite Readiness Score (0 to 100)
-            -- 70% Real Environmental/Traffic reality, 30% AV Sensor response
-            ROUND(
-                100.0
-                - (CASE WHEN w.is_dust_storm = 1 THEN 35.0 ELSE 0.0 END)
-                - (CASE WHEN w.is_extreme_heat = 1 THEN 20.0 ELSE 0.0 END)
-                - (CASE WHEN w.wind_gusts_max_kmh > 50.0 THEN 15.0 ELSE 0.0 END)
-                - (ISNULL(a.accident_count, 0) * 5.0)
-                - (ISNULL(t.disengagements_count, 0) * 8.0),
-                2
-            ) AS av_readiness_score
-        FROM silver.sa_weather w
-        JOIN gold.dim_city c ON w.city_id = c.city_id
-        JOIN gold.dim_date d ON w.weather_date = d.calendar_date
-        JOIN gold.dim_weather_hazard h ON w.weather_code_wmo = h.weather_code_wmo
-        LEFT JOIN acc_agg a ON w.city_id = a.city_id AND w.weather_date = a.accident_date
-        LEFT JOIN tel_agg t ON w.city_id = t.city_id AND w.weather_date = t.telemetry_date;
+        INSERT prep.saudi_region_month
+        SELECT hm.region_code, hm.station_id, hm.month_start, hm.hours_observed, hm.temp_mean_c, hm.temp_max_c,
+               hm.wind_max_ms, hm.rain_mm, hm.dust_hours, hm.haze_hours, hm.fog_hours, hm.low_vis_hours,
+               hm.obscured_hours, hm.rain_hours, hm.normal_hours, hm.night_hours,
+               dm.days_observed, dm.dust_days, dm.obscured_days, dm.rain_days, dm.normal_days
+        FROM hm JOIN dm ON dm.station_id = hm.station_id AND dm.month_start = hm.month_start;
 
-        SELECT @rows_facts = COUNT_BIG(*) FROM gold.fact_daily_av_risk;
-        SET @end_time = SYSDATETIME();
+        -------------------------------------------------- 4a. AV crash relative risk (NHTSA x US weather)
+        -- exposure = share of hours in each condition at the state's analog station(s),
+        -- weighted by where the crashes happened (CA: LAX+SFO, AZ: PHX, TX: AUS)
+        ;WITH crash AS (
+            SELECT us_state, weather_bucket, is_night FROM silver.nhtsa_crash WHERE in_scope = 1
+        ), w_state AS (
+            SELECT us_state, COUNT(*) * 1.0 / SUM(COUNT(*)) OVER () AS w
+            FROM crash WHERE weather_bucket <> 'unknown' GROUP BY us_state
+        ), exp_state AS (
+            SELECT s.us_state, h.hour_bucket AS level, COUNT(*) * 1.0 / SUM(COUNT(*)) OVER (PARTITION BY s.us_state) AS share
+            FROM prep.weather_station_hour h JOIN silver.dim_station s ON s.station_id = h.station_id AND s.country = 'US'
+            GROUP BY s.us_state, h.hour_bucket
+        ), exp_w AS (
+            SELECT e.level, SUM(e.share * w.w) AS exposure_share
+            FROM exp_state e JOIN w_state w ON w.us_state = e.us_state GROUP BY e.level
+        ), ev AS (
+            SELECT weather_bucket AS level, COUNT(*) AS events, COUNT(*) * 1.0 / SUM(COUNT(*)) OVER () AS event_share
+            FROM crash WHERE weather_bucket <> 'unknown' GROUP BY weather_bucket
+        ), lv AS (SELECT level FROM (VALUES ('normal'), ('rain'), ('obscured')) v(level))
+        INSERT prep.av_relative_risk (event_source, factor, level, events, event_share, exposure, exposure_share, relative_risk)
+        SELECT 'nhtsa_crash', 'weather', lv.level, ISNULL(ev.events, 0), ISNULL(ev.event_share, 0), NULL, x.exposure_share,
+               (ISNULL(ev.event_share, 0) / NULLIF(x.exposure_share, 0))
+             / NULLIF((SELECT e2.event_share / NULLIF(x2.exposure_share, 0)
+                       FROM ev e2 JOIN exp_w x2 ON x2.level = e2.level WHERE e2.level = 'normal'), 0)
+        FROM lv LEFT JOIN ev ON ev.level = lv.level LEFT JOIN exp_w x ON x.level = lv.level;
+
+        ;WITH crash AS (
+            SELECT us_state, CASE WHEN is_night = 1 THEN 'night' ELSE 'day' END AS level
+            FROM silver.nhtsa_crash WHERE in_scope = 1 AND is_night IS NOT NULL
+        ), w_state AS (
+            SELECT us_state, COUNT(*) * 1.0 / SUM(COUNT(*)) OVER () AS w FROM crash GROUP BY us_state
+        ), exp_state AS (
+            SELECT s.us_state, CASE WHEN h.is_night = 1 THEN 'night' ELSE 'day' END AS level,
+                   COUNT(*) * 1.0 / SUM(COUNT(*)) OVER (PARTITION BY s.us_state) AS share
+            FROM prep.weather_station_hour h JOIN silver.dim_station s ON s.station_id = h.station_id AND s.country = 'US'
+            GROUP BY s.us_state, CASE WHEN h.is_night = 1 THEN 'night' ELSE 'day' END
+        ), exp_w AS (
+            SELECT e.level, SUM(e.share * w.w) AS exposure_share
+            FROM exp_state e JOIN w_state w ON w.us_state = e.us_state GROUP BY e.level
+        ), ev AS (
+            SELECT level, COUNT(*) AS events, COUNT(*) * 1.0 / SUM(COUNT(*)) OVER () AS event_share
+            FROM crash GROUP BY level
+        )
+        INSERT prep.av_relative_risk (event_source, factor, level, events, event_share, exposure, exposure_share, relative_risk)
+        SELECT 'nhtsa_crash', 'light', ev.level, ev.events, ev.event_share, NULL, x.exposure_share,
+               (ev.event_share / NULLIF(x.exposure_share, 0))
+             / NULLIF((SELECT e2.event_share / NULLIF(x2.exposure_share, 0)
+                       FROM ev e2 JOIN exp_w x2 ON x2.level = e2.level WHERE e2.level = 'day'), 0)
+        FROM ev JOIN exp_w x ON x.level = ev.level;
+
+        -------------------------------------------------- 4b. AV disengagement relative risk (DMV x CA weather)
+        -- California day type from LAX + SFO (obscured if either station had >= 3 obscured
+        -- hours, else rain if either had rain); exposure = fleet miles of the month spread evenly over its days
+        ;WITH ca_day AS (
+            SELECT d.local_date,
+                   CASE WHEN MAX(d.obscured_hours) >= 3 THEN 'obscured'
+                        WHEN MAX(d.rain_hours) >= 1 THEN 'rain' ELSE 'normal' END AS day_type
+            FROM prep.weather_station_day d
+            JOIN silver.dim_station s ON s.station_id = d.station_id AND s.us_state = 'CA'
+            GROUP BY d.local_date
+        ), miles_month AS (
+            SELECT month_start, SUM(miles) AS miles FROM silver.dmv_mileage_monthly GROUP BY month_start
+        ), day_exp AS (
+            SELECT c.local_date, c.day_type,
+                   m.miles / DAY(EOMONTH(c.local_date)) AS miles_day
+            FROM ca_day c
+            JOIN miles_month m ON m.month_start = DATEFROMPARTS(YEAR(c.local_date), MONTH(c.local_date), 1)
+        ), dis AS (
+            SELECT event_date, COUNT(*) AS n FROM silver.dmv_disengagement GROUP BY event_date
+        ), agg AS (
+            SELECT e.day_type AS level, SUM(ISNULL(d.n, 0)) AS events, SUM(CAST(e.miles_day AS FLOAT)) AS exposure
+            FROM day_exp e LEFT JOIN dis d ON d.event_date = e.local_date
+            GROUP BY e.day_type
+        ), lv AS (SELECT level FROM (VALUES ('normal'), ('rain'), ('obscured')) v(level))
+        INSERT prep.av_relative_risk (event_source, factor, level, events, event_share, exposure, exposure_share, relative_risk)
+        SELECT 'dmv_disengagement', 'weather', lv.level, ISNULL(a.events, 0),
+               ISNULL(a.events, 0) * 1.0 / NULLIF((SELECT SUM(events) FROM agg), 0),
+               a.exposure, a.exposure / NULLIF((SELECT SUM(exposure) FROM agg), 0),
+               (ISNULL(a.events, 0) / NULLIF(a.exposure, 0))
+             / NULLIF((SELECT a2.events / NULLIF(a2.exposure, 0) FROM agg a2 WHERE a2.level = 'normal'), 0)
+        FROM lv LEFT JOIN agg a ON a.level = lv.level;
+
+        -- evidence rule: a relative risk is used only when its level has at least 30 events;
+        -- otherwise it stays NULL in Gold and the index treats that condition as neutral (1).
+        UPDATE prep.av_relative_risk
+        SET used_in_index = CASE WHEN events >= 30 AND relative_risk IS NOT NULL THEN 1 ELSE 0 END;
+
+        -------------------------------------------------- 5. Gold: region x month
+        DECLARE @rr_c_rain FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='nhtsa_crash' AND factor='weather' AND level='rain' AND used_in_index = 1),
+                @rr_c_obs  FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='nhtsa_crash' AND factor='weather' AND level='obscured' AND used_in_index = 1),
+                @rr_c_ngt  FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='nhtsa_crash' AND factor='light'   AND level='night' AND used_in_index = 1),
+                @rr_d_rain FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='dmv_disengagement' AND level='rain' AND used_in_index = 1),
+                @rr_d_obs  FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='dmv_disengagement' AND level='obscured' AND used_in_index = 1);
+
+        ;WITH cal AS (
+            SELECT r.region_code, r.region_name_en, r.region_name_ar, s.station_id,
+                   DATEFROMPARTS(y.y, m.m, 1) AS month_start, y.y, m.m
+            FROM silver.dim_region r
+            JOIN silver.dim_station s ON s.region_code = r.region_code
+            CROSS JOIN (VALUES (2021),(2022),(2023),(2024),(2025)) y(y)
+            CROSS JOIN (VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12)) m(m)
+        ), w AS (
+            SELECT p.*, NULLIF(p.hours_observed, 0) * 1.0 AS hrs, NULLIF(p.days_observed, 0) * 1.0 AS dys
+            FROM prep.saudi_region_month p
+        )
+        INSERT gold.av_readiness_region_month (
+            region_code, region_name_en, region_name_ar, weather_station_id, [year], [month], month_start, season,
+            wx_hours_observed, wx_hours_in_month, wx_coverage_pct, temp_mean_c, temp_max_c, wind_max_ms, rain_mm,
+            share_dust_hours, share_haze_hours, share_fog_hours, share_low_vis_hours, share_obscured_hours,
+            share_rain_hours, share_normal_hours, share_night_hours,
+            days_observed, dust_days, obscured_days, rain_days, normal_days,
+            acc_year_serious, acc_year_deaths, acc_year_injuries, acc_year_serious_within_cities,
+            acc_year_serious_outside_cities, acc_share_outside_cities, acc_serious_month_avg,
+            av_rr_crash_rain, av_rr_crash_obscured, av_rr_crash_night, av_rr_diseng_rain_day, av_rr_diseng_obscured_day,
+            av_crash_risk_index, av_diseng_risk_index,
+            src_weather, src_accidents, src_av, gold_batch_id)
+        SELECT c.region_code, c.region_name_en, c.region_name_ar, c.station_id, c.y, c.m, c.month_start,
+               CASE WHEN c.m IN (12,1,2) THEN 'winter' WHEN c.m IN (3,4,5) THEN 'spring'
+                    WHEN c.m IN (6,7,8) THEN 'summer' ELSE 'autumn' END,
+               w.hours_observed, DAY(EOMONTH(c.month_start)) * 24,
+               CAST(100.0 * w.hours_observed / (DAY(EOMONTH(c.month_start)) * 24) AS DECIMAL(5,1)),
+               w.temp_mean_c, w.temp_max_c, w.wind_max_ms, w.rain_mm,
+               CAST(w.dust_hours / w.hrs AS DECIMAL(6,4)), CAST(w.haze_hours / w.hrs AS DECIMAL(6,4)),
+               CAST(w.fog_hours / w.hrs AS DECIMAL(6,4)), CAST(w.low_vis_hours / w.hrs AS DECIMAL(6,4)),
+               CAST(w.obscured_hours / w.hrs AS DECIMAL(6,4)), CAST(w.rain_hours / w.hrs AS DECIMAL(6,4)),
+               CAST(w.normal_hours / w.hrs AS DECIMAL(6,4)), CAST(w.night_hours / w.hrs AS DECIMAL(6,4)),
+               w.days_observed, w.dust_days, w.obscured_days, w.rain_days, w.normal_days,
+               a.serious_accidents, a.deaths, a.injuries, a.serious_within_cities, a.serious_outside_cities,
+               CAST(a.serious_outside_cities * 1.0 / NULLIF(a.serious_within_cities + a.serious_outside_cities, 0) AS DECIMAL(6,4)),
+               CAST(a.serious_accidents / 12.0 AS DECIMAL(9,2)),
+               @rr_c_rain, @rr_c_obs, @rr_c_ngt, @rr_d_rain, @rr_d_obs,
+               -- weather part only: the night ratio is kept as a column but not multiplied in,
+               -- because its exposure (hours of darkness) is not AV miles driven at night
+               CAST( w.normal_hours / w.hrs + w.rain_hours / w.hrs * ISNULL(@rr_c_rain, 1)
+                   + w.obscured_hours / w.hrs * ISNULL(@rr_c_obs, 1) AS DECIMAL(9,4)),
+               CAST( w.normal_days / w.dys + w.rain_days / w.dys * ISNULL(@rr_d_rain, 1)
+                   + w.obscured_days / w.dys * ISNULL(@rr_d_obs, 1) AS DECIMAL(9,4)),
+               N'NOAA NCEI Global Hourly station ' + c.station_id,
+               a.source_files,
+               N'NHTSA SGO ADS crashes; CA DMV disengagements + mileage; NOAA LAX/SFO/PHX/AUS',
+               @batch
+        FROM cal c
+        LEFT JOIN w ON w.region_code = c.region_code AND w.month_start = c.month_start
+        LEFT JOIN silver.accidents_region_year a ON a.region_code = c.region_code AND a.data_year = c.y;
+        SET @rows = @@ROWCOUNT;
 
         COMMIT;
-
-        INSERT INTO audit.load_log (batch_id, source_name, target_table, start_time, end_time, rows_loaded, status, message)
-        VALUES (@batch_id, 'silver.*', 'gold.fact_daily_av_risk', @start_time, @end_time, @rows_facts, 'SUCCESS', 'Gold dimensions and daily fact loaded');
-
-        PRINT '====================================================================';
-        PRINT 'Gold Layer Load Finished Successfully!';
-        PRINT 'Daily AV Risk Fact Rows: ' + CAST(@rows_facts AS NVARCHAR(20));
-        PRINT 'Total Batch Time:        ' + CAST(DATEDIFF(SECOND, @start_time, SYSDATETIME()) AS NVARCHAR(10)) + 's';
-        PRINT '====================================================================';
-
+        UPDATE audit.load_log SET end_time = SYSDATETIME(), rows_loaded = @rows, status = 'SUCCESS' WHERE load_id = @log;
+        PRINT CONCAT('  gold.av_readiness_region_month: ', @rows, ' rows');
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;
-        SET @end_time = SYSDATETIME();
-
-        INSERT INTO audit.load_log (batch_id, source_name, target_table, start_time, end_time, rows_loaded, status, message)
-        VALUES (@batch_id, 'silver.*', 'gold.*', @start_time, @end_time, 0, 'FAILED', ERROR_MESSAGE());
-
-        PRINT '====================================================================';
-        PRINT 'ERROR in gold.load_gold: ' + ERROR_MESSAGE();
-        PRINT '====================================================================';
+        UPDATE audit.load_log SET end_time = SYSDATETIME(), status = 'FAILED', message = LEFT(ERROR_MESSAGE(), 2000) WHERE load_id = @log;
         THROW;
     END CATCH;
-END;
+END
+GO
+
+PRINT 'Gold objects created.';
 GO
