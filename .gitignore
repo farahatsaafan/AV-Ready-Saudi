@@ -26,3 +26,6 @@ reference_sample/
 # Private team discussion & exam preparation guides
 *DISCUSSION_GUIDE*
 *discussion_guide*
+
+# Local Python environment created by run_pipeline_mac.sh
+.venv/
