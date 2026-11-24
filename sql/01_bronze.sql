@@ -13,7 +13,8 @@
 --   4. bronze.dmv_mileage        California DMV AV mileage reports 2021-2024
 --   5. bronze.nhtsa_sgo_ads      NHTSA Standing General Order ADS crash reports
 --
--- Input: Data/landing/*.tsv produced by python/00_land_raw.py (container format
+-- Input: Data/landing/*.tsv (UTF-16LE, tab, CRLF) produced by python/00_land_raw.py. UTF-16 is used
+-- because CODEPAGE = '65001' is not supported by SQL Server on Linux. (container format
 -- only - see that script). Columns shared by all files of a source are real
 -- columns; every other column is kept, with its original header, in a JSON text
 -- column so nothing is dropped.
@@ -209,8 +210,8 @@ BEGIN
         BEGIN TRY
             SET @sql = N'TRUNCATE TABLE ' + @tbl + N';
 BULK INSERT ' + @view + N' FROM ''' + @landing_path + N'/' + @file + N'''
-WITH (FIRSTROW = 2, FIELDTERMINATOR = ''\t'', ROWTERMINATOR = ''0x0a'',
-      CODEPAGE = ''65001'', DATAFILETYPE = ''char'', TABLOCK);
+WITH (FIRSTROW = 2, FIELDTERMINATOR = ''\t'', ROWTERMINATOR = ''\n'',
+      DATAFILETYPE = ''widechar'', TABLOCK);
 UPDATE ' + @tbl + N' SET load_batch_id = @b WHERE load_batch_id IS NULL;
 SELECT @r = COUNT_BIG(*) FROM ' + @tbl + N';';
             EXEC sp_executesql @sql, N'@b UNIQUEIDENTIFIER, @r BIGINT OUTPUT', @b = @batch, @r = @rows OUTPUT;
