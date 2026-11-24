@@ -41,10 +41,13 @@ echo ">>> 1. Landing raw files"
 "$PY" python/00_land_raw.py
 
 echo ">>> Copying sql/ and Data/landing/ into the container"
-docker exec "$C" rm -rf /tmp/av
-docker exec "$C" mkdir -p /tmp/av
+# run as root inside the container: copied files keep the Mac's owner and mode (often 600),
+# and sqlcmd / sqlservr run as the "mssql" user, which then cannot read them ("Invalid filename").
+docker exec -u 0 "$C" rm -rf /tmp/av
+docker exec -u 0 "$C" mkdir -p /tmp/av
 docker cp ./sql "$C":/tmp/av/sql
 docker cp ./Data/landing "$C":/tmp/av/landing
+docker exec -u 0 "$C" chmod -R a+rX /tmp/av
 
 run()   { echo; echo ">>> $1"; docker exec -e SQLCMDPASSWORD="$PW" "$C" "$SQLCMD_IN_CONTAINER" -S localhost -U sa -C -b -f 65001 -i "/tmp/av/sql/$1"; }
 query() { echo; echo ">>> $1"; docker exec -e SQLCMDPASSWORD="$PW" "$C" "$SQLCMD_IN_CONTAINER" -S localhost -U sa -C -b -f 65001 -d av_ready_saudi_dw -Q "$1"; }
