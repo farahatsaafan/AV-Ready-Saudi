@@ -5,9 +5,11 @@
 **Team:** Farahat Saafan, Ali Ezzat, Rokaia, Hajar Radwan, Malak Tamer
 **Repository:** [github.com/farahatsaafan/AV-Ready-Saudi](https://github.com/farahatsaafan/AV-Ready-Saudi)
 
-> Branch `dev-ali-ezzat` — redesign of 24 Nov 2026: real data only (0 % generated), relations defined first,
-> one Gold table. Full design: **[docs/05_relations_and_lineage.md](docs/05_relations_and_lineage.md)**.
-> The reports in `docs/reports/01–03` describe the previous design and will be regenerated from a run of this one.
+> Redesign of 24 Nov 2026: real data only (0 % generated), relations defined first, one Gold table.
+> Full design: **[docs/05_relations_and_lineage.md](docs/05_relations_and_lineage.md)** ·
+> layer reports: [Bronze](docs/reports/01_bronze_report.md), [Silver](docs/reports/02_silver_report.md),
+> [Gold](docs/reports/03_gold_report.md) · [data dictionary](docs/02_data_dictionary.md) ·
+> [review note for Dr. Omar](docs/06_review_note_dr_omar.md).
 
 ## 1. Question
 
@@ -55,7 +57,7 @@ SA_PASSWORD='your-sa-password' bash run_pipeline_mac.sh
 ```
 
 The script lands the raw files, copies `sql/` and `Data/landing/` into the container `sql2022`, runs
-`00_init → 01_bronze → 02_silver → 03_gold` with their load procedures, then the three quality scripts, then the
+`00_init → 01_bronze → 02_silver → 03_gold` with their load procedures, then the four quality scripts, then the
 independent pandas rebuild (`python/02_reference_gold.py`) whose expected counts are listed in
 [docs/05_relations_and_lineage.md §9](docs/05_relations_and_lineage.md). Windows: `run_pipeline.ps1`.
 
@@ -72,8 +74,10 @@ sql/01_bronze.sql               Bronze tables + bronze.load_bronze
 sql/02_silver.sql               Silver tables, reference data + silver.load_silver
 sql/03_gold.sql                 prep tables, the Gold table + gold.load_gold
 sql/04_analysis.sql             first EDA queries on Gold (bad vs good weather years, region profiles)
-sql/quality/                    Bronze validation, Silver reconciliation, Gold checks + data shares
+sql/quality/                    Bronze validation, Silver reconciliation, Gold checks + data shares, rollback demo
 docs/05_relations_and_lineage.md  relations, rules, lineage, data shares, limitations
+docs/reports/01-03               Bronze, Silver, Gold reports (run of 24 Nov 2026)
+docs/02_data_dictionary.md       every column of every table (also data_dictionary.csv)
 run_pipeline_mac.sh / run_pipeline.ps1
 ```
 

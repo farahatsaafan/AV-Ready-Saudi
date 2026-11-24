@@ -1,56 +1,74 @@
-# تقرير الطبقة الفضية (Silver Layer Report)
+# Silver Layer Report — AV-Ready-Saudi
 
-**المشروع:** AV-Ready-Saudi  
-**المقرر:** مستودعات البيانات والتنقيب (Data Mining & Data Warehousing)  
-**الطبقة:** Silver Layer (Cleansed, Typed, Deduplicated & Audited)  
-**قاعدة البيانات:** `av_ready_saudi_dw`  
-**الـ Schema المستهدف:** `silver.*`  
+Run: 24 Nov 2026 · script `sql/02_silver.sql` · procedure `silver.load_silver`.
 
----
+## 1. Purpose
 
-## 1. الهدف المعماري للطبقة الفضية (Architectural Objective)
-تحويل البيانات الخام من طبقة البرونز إلى **بيانات مؤسسية موثوقة ومطابقة لقواعد الجودة (Trusted Enterprise Data)** من خلال:
-1. فرض الأنواع الفيزيائية القوية (`DATE`, `INT`, `DECIMAL`, `BIT`).
-2. إضافة مفاتيح بديلة للمستودع (`Surrogate Primary Keys`).
-3. عزل وتوثيق أي صف غير مطابق في جدول الحجر الصحي `silver.reject_log`.
-4. إضافة عمود التدقيق والتتبع الزمني `DW_create_date`.
-5. ضمان التوازن الرياضي التام لقواعد البيانات (Reconciliation Gate).
+Silver makes Bronze trusted: Trim · Standardize · Convert · Deduplicate · Validate · Reject (with a reason, never
+silently) — Lab 4. No aggregation to region or month happens here; that is Gold's job.
 
----
+## 2. Reference tables (the join keys of the model)
 
-## 2. منهجية الأفعال الستة للتنظيف (The 6 Core Verbs Execution)
-طبق إجراء التحميل `silver.load_silver` المكتوب في `sql/02_silver.sql` الأفعال الستة التالية:
+| Table | Rows | Content |
+|---|---:|---|
+| `silver.dim_region` | 13 | region code, English and Arabic name |
+| `silver.region_alias` | 13 | normalised GASTAT label → region code |
+| `silver.dim_station` | 17 | NOAA station → Saudi region or US state, time zone, coordinates |
+| `silver.gastat_sheet_map` | 18 | which sheet / column / rows of which workbook hold which metric and year |
 
-1. **التهذيب (Trim):** إزالة المسافات البيضاء الزائدة من البداية والنهاية عبر `NULLIF(LTRIM(RTRIM(col)), '')`.
-2. **التوحيد والتقييس (Standardize):** تحويل النصوص لحروف كبيرة موحدة (`UPPER`) وتوحيد أكواد المدن والحالات.
-3. **التحويل الآمن للأنواع (Convert):** استخدام دالة `TRY_CONVERT` للتحويل إلى `DATE`, `DECIMAL(5,2)`, `INT` لمنع انهيار الاستعلامات.
-4. **إزالة التكرار (Deduplicate):** تطبيق دالة الترتيب النافذية `ROW_NUMBER() OVER (PARTITION BY [Natural_Keys] ORDER BY [Key] ASC)` والاحتفاظ بالإصدار الأول فقط (`rn = 1`).
-5. **التحقق والحجر الصحي (Validate & Reject):** عزل الصفوف المخالفة للشروط المنطقية والفيزيائية داخل `silver.reject_log` مع تسجيل سبب الرفض بالتفصيل.
-6. **الأمان المعاملي (Transaction Safety):** تغليف كافة عمليات التحويل في معاملة ذرية `BEGIN TRAN ... COMMIT / ROLLBACK` مع تفعيل `SET XACT_ABORT ON`.
+## 3. Cleaned tables
 
----
+| Table | Rows | Grain | Main rules |
+|---|---:|---|---|
+| `weather_obs` | 920 127 | one weather report | parse fixed-width ISD groups (visibility m, temperature °C, wind m/s, 1-h precipitation); 999999/9999 → NULL; quality 2/3/6/7 → NULL; remove SOD/SOM; dedupe station + time + report type; UTC → local time (`AT TIME ZONE`); flags dust, haze, fog, rain, low visibility (< 5 km), night (sun elevation < −0.833°); keep local years 2021–2025 |
+| `accidents_region_year` | 65 | region × year | read mapped cells, normalise region label, number check; 2025 total serious = within + outside cities (workbook total is a formula) |
+| `dmv_disengagement` | 49 066 | one disengagement | date from 4 formats (+ alphabetic month); window 2020-12-01..2024-11-30; manufacturer trimmed/upper; initiator and location standardised; cause category by keyword rules; program (drivered / driverless / first-time) from the file |
+| `dmv_mileage_monthly` | 113 900 | vehicle × month | unpivot month JSON (`OPENJSON`), "1,049.54" → 1049.54; same VIN-month in two files → one row |
+| `nhtsa_crash` | 3 244 | one crash | latest report version; one report per "Same Incident ID"; same crash in both files → archive copy; `SEP-2026` → date; weather flags → bucket normal / rain / obscured / unknown; night from the Lighting field, else sun position; `in_scope` = CA/AZ/TX and 2021–2025 (1 893 rows) |
 
-## 3. إحصائيات الجداول الفضية وسجل الاستبعاد (Silver Tables & Reject Log)
+Typed columns (INT, DECIMAL, DATE, DATETIME2, TIME, BIT), primary keys on every table, `dw_create_date` on every row.
 
-| الجدول الفضي | المفتاح البديل (Surrogate Key) | المفتاح الطبيعي (Natural Key) | عدد الصفوف السليمة | عدد الصفوف المستبعدة |
-| :--- | :--- | :--- | :---: | :---: |
-| `silver.sa_weather` | `weather_key (INT IDENTITY)` | `date + city_id` | **21,920** | **0** |
-| `silver.sa_traffic_accidents` | `accident_key (INT IDENTITY)` | `accident_id` | **5,066** | **0** |
-| `silver.av_telemetry` | `telemetry_key (INT IDENTITY)` | `telemetry_id` | **12,000** | **0** |
-| **`silver.reject_log`** | `reject_id (BIGINT IDENTITY)` | — | — | **0 مرفوضات** |
+## 4. Condition vocabulary (shared by Saudi weather and US AV events)
 
----
+| Flag | WMO / METAR rule |
+|---|---|
+| dust | present weather 06–09, 30–35; obscuration DU/SA; dust/sand whirls, sandstorm, duststorm |
+| haze / smoke | 04–05 (manual and automated); obscuration FU/HZ |
+| fog | manual 40–49, automated 30–35; obscuration FG |
+| rain | manual 50–69, 80–99; automated 40–69, 80–89; DZ/RA/UP; measured 1-h precipitation > 0 |
+| low visibility | visibility < 5 000 m |
+| night | solar elevation < −0.833° (NOAA solar-position equations, `silver.tvf_solar_elevation`) |
 
-## 4. معادلة المطابقة والتوازن الرياضي (Mathematical Reconciliation Gate)
-وفقاً للمعيار الإلزامي في شيتات اللاب وقالب الدكتور الرسمي:
-$$\text{Bronze Rows} = \text{Silver Rows} + \text{Quarantined Rejects} + \text{Duplicate Rows}$$
+## 5. Rejects (`silver.reject_log`)
 
-### نتائج التحقق الإحصائي:
-1. **الطقس (Weather):**
-   $$21,920 \text{ (Bronze)} = 21,920 \text{ (Silver)} + 0 \text{ (Rejected)} + 0 \text{ (Duplicates)} \quad \checkmark \text{ [BALANCED]}$$
-2. **حوادث الطرق (Accidents):**
-   $$5,066 \text{ (Bronze)} = 5,066 \text{ (Silver)} + 0 \text{ (Rejected)} + 0 \text{ (Duplicates)} \quad \checkmark \text{ [BALANCED]}$$
-3. **التيليمتري والأعطال (AV Telemetry):**
-   $$12,000 \text{ (Bronze)} = 12,000 \text{ (Silver)} + 0 \text{ (Rejected)} + 0 \text{ (Duplicates)} \quad \checkmark \text{ [BALANCED]}$$
+| Table | Reason | Rows |
+|---|---|---:|
+| dmv_disengagement | unparsable or missing date | 56 |
+| dmv_disengagement | date outside DMV reporting window | 2 |
+| nhtsa_crash | same crash already in the archive file | 19 |
+| nhtsa_crash | unparsable incident month | 1 |
+| accidents_region_year | — | 0 |
+| weather_obs | unparsable DATE | 0 |
 
-* **النتيجة الإجمالية:** خط الأنابيب متوازن بنسبة **100.0%** (إجمالي 38,986 صفاً بنسبة موثوقية رسمية واقعية **69.2%**)، وجاهز للبناء البعدي في الطبقة الذهبية.
+## 6. Reconciliation (`sql/quality/02_silver_reconciliation.sql`) — all PASS
+
+- Weather: 927 141 Bronze = 920 127 Silver + 0 rejected + SOD/SOM summaries + duplicate reports + reports outside 2021–2025.
+- Disengagements: 49 124 Bronze = 49 066 Silver + 58 rejected.
+- Crashes: 4 087 Bronze = 3 244 Silver + 20 rejected + older report versions + same-incident duplicates.
+- Accidents: 65 rows = 13 regions × 5 years, 0 rejected cells.
+- National totals equal GASTAT's published totals: serious accidents 2023 16 534 · 2024 17 231 · 2025 17 805;
+  deaths 2023 4 423 · 2024 4 282 · 2025 4 448.
+
+## 7. Error handling
+
+Each step: audit row (RUNNING) → `BEGIN TRAN` → `TRUNCATE` → load → `COMMIT` → audit SUCCESS; `CATCH` → `ROLLBACK`,
+audit FAILED with the message, `THROW`. `SET XACT_ABORT ON` also rolls back errors TRY/CATCH cannot catch (found in the
+first run: a collation error left a transaction open).
+Forced-failure demo: `sql/quality/04_rollback_demo.sql` truncates `accidents_region_year` inside a transaction, divides
+by zero, and checks that the 65 rows are still there.
+
+## 8. Assumptions
+
+- One airport station represents each region (the region's main station).
+- Cause categories of disengagements are keyword rules on free text (heuristic; used for EDA, not for the indices).
+- Missing quality-flagged values are NULL, never imputed.

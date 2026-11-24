@@ -37,4 +37,5 @@ Run-Query "EXEC gold.load_gold;"
 Run-Sql "quality\01_bronze_validation.sql"
 Run-Sql "quality\02_silver_reconciliation.sql"
 Run-Sql "quality\03_gold_checks.sql"
+Run-Sql "quality\04_rollback_demo.sql"
 Write-Host "Done. Gold table: gold.av_readiness_region_month" -ForegroundColor Green

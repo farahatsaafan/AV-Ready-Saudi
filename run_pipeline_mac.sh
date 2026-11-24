@@ -65,6 +65,7 @@ echo ">>> 3. Quality checks"
 run quality/01_bronze_validation.sql
 run quality/02_silver_reconciliation.sql
 run quality/03_gold_checks.sql
+run quality/04_rollback_demo.sql
 
 echo ">>> 4. Independent reference build (pandas)"
 "$PY" python/02_reference_gold.py > Data/reference_run.log 2>&1 && echo "Reference written to Data/reference/ (log: Data/reference_run.log)" \
