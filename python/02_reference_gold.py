@@ -74,7 +74,7 @@ BAD_Q = set("2367")
 
 def read_tsv(name: str) -> pd.DataFrame:
     return pd.read_csv(LAND / name, sep="\t", dtype=str, keep_default_na=False, quoting=3,
-                       na_filter=False, engine="c", encoding="utf-16-le")
+                       na_filter=False, engine="c", encoding="utf-16")
 
 
 def solar_elevation(lat, lon, utc: pd.Series) -> np.ndarray:

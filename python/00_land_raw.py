@@ -18,7 +18,7 @@ as text: no trimming, no type conversion, no row or column is dropped.
   * Excel cells are written one row per cell (file, sheet, row, column, value);
     formulas such as =SUM(B8:B20) are kept as the formula text
 
-Output: Data/landing/*.tsv  (UTF-16LE, tab-separated, CRLF line ends, header row).
+Output: Data/landing/*.tsv  (UTF-16LE with BOM, tab-separated, CRLF line ends, header row).
 Tabs and line breaks inside plain-text values are written as the two-character
 sequences \\t, \\r, \\n so a value can never break the TSV layout.
 
@@ -70,7 +70,8 @@ class Writer:
         self.path = OUT / name
         # UTF-16LE + CRLF: SQL Server on Linux cannot read UTF-8 with CODEPAGE, but it reads
         # UTF-16 natively (BULK INSERT ... DATAFILETYPE = 'widechar', ROWTERMINATOR = '\n' = CRLF).
-        self.fh = open(self.path, "w", encoding="utf-16-le", newline="\r\n")
+        # "utf-16" writes the byte-order mark (FF FE) that BULK INSERT needs to accept widechar.
+        self.fh = open(self.path, "w", encoding="utf-16", newline="\r\n")
         self.ncol = len(header)
         self.rows = 0
         self.fh.write("\t".join(header) + "\n")
