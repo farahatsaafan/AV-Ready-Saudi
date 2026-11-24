@@ -58,6 +58,7 @@ CREATE TABLE bronze.noaa_hourly (
     [AW1]            NVARCHAR(50)   NULL,
     [AU1]            NVARCHAR(50)   NULL,
     extra_json       NVARCHAR(MAX)  NULL,
+    row_end          NVARCHAR(10)   NULL,   -- line-end marker from landing (always ".")
     load_batch_id    UNIQUEIDENTIFIER NULL,
     ingested_at      DATETIME2      NOT NULL DEFAULT SYSDATETIME()
 );
@@ -65,7 +66,7 @@ GO
 CREATE VIEW bronze.v_noaa_hourly_load AS
 SELECT source_file, source_row_num, [STATION], [DATE], [SOURCE], [LATITUDE], [LONGITUDE],
        [ELEVATION], [NAME], [REPORT_TYPE], [CALL_SIGN], [QUALITY_CONTROL], [WND], [CIG],
-       [VIS], [TMP], [DEW], [SLP], [AA1], [MW1], [AW1], [AU1], extra_json
+       [VIS], [TMP], [DEW], [SLP], [AA1], [MW1], [AW1], [AU1], extra_json, row_end
 FROM bronze.noaa_hourly;
 GO
 
@@ -81,12 +82,13 @@ CREATE TABLE bronze.gastat_cells (
     row_num        NVARCHAR(20)   NULL,
     col_num        NVARCHAR(20)   NULL,
     cell_value     NVARCHAR(MAX)  NULL,
+    row_end          NVARCHAR(10)   NULL,   -- line-end marker from landing (always ".")
     load_batch_id  UNIQUEIDENTIFIER NULL,
     ingested_at    DATETIME2      NOT NULL DEFAULT SYSDATETIME()
 );
 GO
 CREATE VIEW bronze.v_gastat_cells_load AS
-SELECT source_file, sheet_name, row_num, col_num, cell_value FROM bronze.gastat_cells;
+SELECT source_file, sheet_name, row_num, col_num, cell_value, row_end FROM bronze.gastat_cells;
 GO
 
 -- ------------------------------------------------------------------------------
@@ -108,13 +110,14 @@ CREATE TABLE bronze.dmv_disengagements (
     location               NVARCHAR(200)  NULL,
     description            NVARCHAR(MAX)  NULL,
     extra_json             NVARCHAR(MAX)  NULL,
+    row_end          NVARCHAR(10)   NULL,   -- line-end marker from landing (always ".")
     load_batch_id          UNIQUEIDENTIFIER NULL,
     ingested_at            DATETIME2      NOT NULL DEFAULT SYSDATETIME()
 );
 GO
 CREATE VIEW bronze.v_dmv_disengagements_load AS
 SELECT source_file, source_row_num, manufacturer, permit_number, date_raw, vin,
-       capable_without_driver, driver_present, initiated_by, location, description, extra_json
+       capable_without_driver, driver_present, initiated_by, location, description, extra_json, row_end
 FROM bronze.dmv_disengagements;
 GO
 
@@ -132,13 +135,14 @@ CREATE TABLE bronze.dmv_mileage (
     vin                    NVARCHAR(100)  NULL,
     annual_disengagements  NVARCHAR(100)  NULL,
     months_json            NVARCHAR(MAX)  NULL,
+    row_end          NVARCHAR(10)   NULL,   -- line-end marker from landing (always ".")
     load_batch_id          UNIQUEIDENTIFIER NULL,
     ingested_at            DATETIME2      NOT NULL DEFAULT SYSDATETIME()
 );
 GO
 CREATE VIEW bronze.v_dmv_mileage_load AS
 SELECT source_file, source_row_num, manufacturer, permit_number, vin,
-       annual_disengagements, months_json
+       annual_disengagements, months_json, row_end
 FROM bronze.dmv_mileage;
 GO
 
@@ -165,6 +169,7 @@ CREATE TABLE bronze.nhtsa_sgo_ads (
     [Posted Speed Limit (MPH)] NVARCHAR(50) NULL,
     [Lighting]          NVARCHAR(100) NULL,
     row_json            NVARCHAR(MAX) NULL,
+    row_end          NVARCHAR(10)   NULL,   -- line-end marker from landing (always ".")
     load_batch_id       UNIQUEIDENTIFIER NULL,
     ingested_at         DATETIME2     NOT NULL DEFAULT SYSDATETIME()
 );
@@ -172,7 +177,7 @@ GO
 CREATE VIEW bronze.v_nhtsa_sgo_ads_load AS
 SELECT source_file, source_row_num, [Report ID], [Report Version], [Reporting Entity], [Make],
        [Model], [Model Year], [State], [City], [Incident Date], [Incident Time (24:00)],
-       [Roadway Type], [Posted Speed Limit (MPH)], [Lighting], row_json
+       [Roadway Type], [Posted Speed Limit (MPH)], [Lighting], row_json, row_end
 FROM bronze.nhtsa_sgo_ads;
 GO
 

@@ -197,6 +197,8 @@ def silver_dmv(counts: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
     m2 = tok.str.match(r"^\d{4}\."); dt[m2] = pd.to_datetime(tok[m2], format="%Y.%m.%d", errors="coerce")
     m3 = tok.str.match(r".*/\d{4}$"); dt[m3] = pd.to_datetime(tok[m3], format="%m/%d/%Y", errors="coerce")
     m4 = tok.str.match(r".*/\d{2}$") & ~m3; dt[m4] = pd.to_datetime(tok[m4], format="%m/%d/%y", errors="coerce")
+    # "15/Apr/22": SQL Server's TRY_CONVERT reads an alphabetic month whatever the style
+    m5 = tok.str.match(r"^\d{1,2}/[A-Za-z]{3}/\d{2}$"); dt[m5] = pd.to_datetime(tok[m5], format="%d/%b/%y", errors="coerce")
     d["event_date"] = pd.to_datetime(dt)
     ok = (d["manufacturer"].str.strip() != "") & d["event_date"].between("2020-12-01", "2024-11-30")
     d = d[ok]

@@ -281,6 +281,7 @@ CREATE OR ALTER PROCEDURE silver.load_silver
 AS
 BEGIN
     SET NOCOUNT ON;
+    SET XACT_ABORT ON;   -- any error (also compile-time ones TRY/CATCH cannot catch) rolls the step back
     DECLARE @batch UNIQUEIDENTIFIER = NEWID(), @t0 DATETIME2, @rows BIGINT, @log BIGINT;
 
     ---------------------------------------------------------------- weather_obs
@@ -551,19 +552,21 @@ BEGIN
         SELECT m.source_file, m.source_row_num,
                ISNULL(LTRIM(RTRIM(m.permit_number)), '') AS permit_number, ISNULL(LTRIM(RTRIM(m.vin)), '') AS vin,
                ISNULL(UPPER(LTRIM(RTRIM(REPLACE(REPLACE(m.manufacturer, ',', ''), '.', '')))), '') AS manufacturer,
-               j.[key] AS month_label, j.[value] AS miles_raw,
-               TRY_CAST(CONCAT(RIGHT(LTRIM(RTRIM(j.[key])), 4), '-',
-                   CASE LEFT(UPPER(LTRIM(j.[key])), 3)
+               j.k AS month_label, j.v AS miles_raw,
+               TRY_CAST(CONCAT(RIGHT(LTRIM(RTRIM(j.k)), 4), '-',
+                   CASE LEFT(UPPER(LTRIM(j.k)), 3)
                      WHEN 'JAN' THEN '01' WHEN 'FEB' THEN '02' WHEN 'MAR' THEN '03' WHEN 'APR' THEN '04'
                      WHEN 'MAY' THEN '05' WHEN 'JUN' THEN '06' WHEN 'JUL' THEN '07' WHEN 'AUG' THEN '08'
                      WHEN 'SEP' THEN '09' WHEN 'OCT' THEN '10' WHEN 'NOV' THEN '11' WHEN 'DEC' THEN '12' END,
                    '-01') AS DATE) AS month_start,
-               TRY_CAST(REPLACE(REPLACE(j.[value], ',', ''), ' ', '') AS DECIMAL(14,2)) AS miles
+               TRY_CAST(REPLACE(REPLACE(j.v, ',', ''), ' ', '') AS DECIMAL(14,2)) AS miles
         INTO #mil
         FROM bronze.dmv_mileage m
-        CROSS APPLY OPENJSON(m.months_json) j
+        -- OPENJSON returns [key] in Latin1_General_BIN2; bring key and value to the database collation
+        CROSS APPLY (SELECT oj.[key] COLLATE DATABASE_DEFAULT AS k, oj.[value] COLLATE DATABASE_DEFAULT AS v
+                     FROM OPENJSON(m.months_json) oj) j
         WHERE ISJSON(m.months_json) = 1
-          AND j.[key] NOT LIKE '%TOTAL%' AND j.[key] NOT LIKE 'col%';
+          AND j.k NOT LIKE '%TOTAL%' AND j.k NOT LIKE 'col%';
 
         INSERT silver.reject_log (source_table, source_file, source_row, reason, raw_value)
         SELECT 'dmv_mileage_monthly', source_file, source_row_num,

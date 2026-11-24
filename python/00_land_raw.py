@@ -74,11 +74,13 @@ class Writer:
         self.fh = open(self.path, "w", encoding="utf-16", newline="\r\n")
         self.ncol = len(header)
         self.rows = 0
-        self.fh.write("\t".join(header) + "\n")
+        # last column "row_end" = "." on every row: whatever line-end convention BULK INSERT
+        # applies (CRLF on Windows, LF on Linux), a leftover CR can only reach this marker.
+        self.fh.write("\t".join(header + ["row_end"]) + "\n")
 
     def row(self, values: list) -> None:
         assert len(values) == self.ncol, (self.path.name, len(values), self.ncol)
-        self.fh.write("\t".join(esc(v) for v in values) + "\n")
+        self.fh.write("\t".join([esc(v) for v in values] + ["."]) + "\n")
         self.rows += 1
 
     def close(self) -> int:

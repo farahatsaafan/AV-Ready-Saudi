@@ -148,6 +148,7 @@ CREATE OR ALTER PROCEDURE gold.load_gold
 AS
 BEGIN
     SET NOCOUNT ON;
+    SET XACT_ABORT ON;
     DECLARE @batch UNIQUEIDENTIFIER = NEWID(), @t0 DATETIME2 = SYSDATETIME(), @rows BIGINT, @log BIGINT;
     INSERT audit.load_log (batch_id, layer, source_name, target_table, start_time, status)
     VALUES (@batch, 'gold', 'silver.*', 'gold.av_readiness_region_month', @t0, 'RUNNING');

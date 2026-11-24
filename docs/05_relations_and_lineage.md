@@ -155,7 +155,7 @@ Real vs generated: **100 % real, 0 % generated.**
 | Weather – Saudi stations (reports) | 695 617 | 64.10 % |
 | Weather – US analog stations (reports) | 224 510 | 20.69 % |
 | Accidents – GASTAT region-year values | 247 | 0.02 % |
-| AV – DMV disengagements | 49 057 | 4.52 % |
+| AV – DMV disengagements | 49 066 | 4.52 % |
 | AV – DMV mileage (vehicle-months) | 113 900 | 10.50 % |
 | AV – NHTSA crashes (CA/AZ/TX) | 1 893 | 0.17 % |
 
@@ -173,7 +173,7 @@ By records, accidents look tiny because GASTAT publishes totals: the 247 values 
 | NHTSA crashes | obscured | 2 | 0.02 | no (< 30 events) |
 | NHTSA crashes | night | 741 | 0.64 | stored only |
 | DMV disengagements | rain days | 5 216 | 0.81 | yes |
-| DMV disengagements | obscured days | 17 847 | 1.34 | yes |
+| DMV disengagements | obscured days | 17 848 | 1.34 | yes |
 
 ## 8. Limitations (to state in the paper)
 
@@ -200,7 +200,7 @@ By records, accidents look tiny because GASTAT publishes totals: the 247 values 
 | bronze.nhtsa_sgo_ads | 4 087 |
 | silver.weather_obs | 920 127 |
 | silver.accidents_region_year | 65 |
-| silver.dmv_disengagement | 49 057 |
+| silver.dmv_disengagement | 49 066 |
 | silver.dmv_mileage_monthly | 113 900 |
 | silver.nhtsa_crash | 3 244 |
 | gold.av_readiness_region_month | 780 |
