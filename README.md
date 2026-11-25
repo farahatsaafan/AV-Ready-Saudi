@@ -27,7 +27,8 @@ through the conditions both places share (rain, dust/haze/fog/low visibility, da
 | AV crashes | NHTSA Standing General Order ADS reports 2021–2025 | crash | US |
 
 Details and links: [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) · register: [docs/data_source_register.csv](docs/data_source_register.csv).
-Raw files are not in Git (`Data/` is ignored); put them under `Data/raw/` as listed there.
+Raw files are not in Git (`Data/` is ignored). **Download:** [Google Drive — New Data](https://drive.google.com/drive/folders/1hmh-0XqcQ9MZ5juEkdRgR7CMA9GsERj3)
+→ `AV-Ready-Saudi_Data_raw.zip`, unzip it in the project folder (it creates `Data/raw/`).
 
 ## 3. Architecture
 
@@ -52,14 +53,20 @@ AV events ↔ US weather on state / date. Every source reaches Gold (checked by 
 
 ```bash
 cd ~/AV-Ready-Saudi
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once
-SA_PASSWORD='your-sa-password' bash run_pipeline_mac.sh
+SA_PASSWORD='your-sa-password' bash run_pipeline_mac.sh   # creates .venv on the first run
 ```
 
 The script lands the raw files, copies `sql/` and `Data/landing/` into the container `sql2022`, runs
 `00_init → 01_bronze → 02_silver → 03_gold` with their load procedures, then the four quality scripts, then the
 independent pandas rebuild (`python/02_reference_gold.py`) whose expected counts are listed in
-[docs/05_relations_and_lineage.md §9](docs/05_relations_and_lineage.md). Windows: `run_pipeline.ps1`.
+[docs/05_relations_and_lineage.md §9](docs/05_relations_and_lineage.md).
+
+Windows (local SQL Server, e.g. SQLEXPRESS): `powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1`
+(add `-ServerInstance "localhost"` for a default instance). Step-by-step for the team, in Arabic:
+[docs/04_team_collaboration_guide.md](docs/04_team_collaboration_guide.md).
+
+An existing `av_ready_saudi_dw` from the old design is upgraded automatically: `sql/00_init.sql` removes the old
+Star Schema, semantic / ml objects and the old `audit.load_log`.
 
 Connect from VS Code (mssql extension): server `localhost,1433`, user `sa`, database `av_ready_saudi_dw`.
 
@@ -78,6 +85,9 @@ sql/quality/                    Bronze validation, Silver reconciliation, Gold c
 docs/05_relations_and_lineage.md  relations, rules, lineage, data shares, limitations
 docs/reports/01-03               Bronze, Silver, Gold reports (run of 24 Nov 2026)
 docs/02_data_dictionary.md       every column of every table (also data_dictionary.csv)
+docs/01_architecture_overview.md layers and run order at a glance
+docs/04_team_collaboration_guide.md  setup guide for the team (Arabic)
+docs/06_review_note_dr_omar.md   open question for Dr. Omar (data shares)
 run_pipeline_mac.sh / run_pipeline.ps1
 ```
 

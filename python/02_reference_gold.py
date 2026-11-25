@@ -117,7 +117,8 @@ def silver_weather(counts: dict) -> pd.DataFrame:
     w = to_int(fixed("WND", 8, 4)).where(~fixed("WND", 13, 1).isin(BAD_Q))
     b["wind_ms"] = w.where(w != 9999) / 10.0
     aa = b["AA1"]
-    b["precip_1h_mm"] = (to_int(aa.str.slice(3, 7)) / 10.0).where((aa.str.slice(0, 2) == "01") & (aa.str.slice(3, 7) != "9999"))
+    b["precip_1h_mm"] = (to_int(aa.str.slice(3, 7)) / 10.0).where((aa.str.slice(0, 2) == "01") & (aa.str.slice(3, 7) != "9999")
+                                                                & ~aa.str.slice(10, 11).isin(BAD_Q))
     mw = b["MW1"].str.slice(0, 2); aw = b["AW1"].str.slice(0, 2)
     aup = b["AU1"].str.slice(4, 6); auo = b["AU1"].str.slice(7, 8); aut = b["AU1"].str.slice(9, 10)
     b["is_dust"] = mw.isin(["06", "07", "08", "09", "30", "31", "32", "33", "34", "35"]) | auo.isin(["5", "6"]) | aut.isin(["1", "4", "5"])

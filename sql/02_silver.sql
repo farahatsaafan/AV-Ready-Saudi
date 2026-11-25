@@ -282,6 +282,9 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;   -- any error (also compile-time ones TRY/CATCH cannot catch) rolls the step back
+    -- month names ("SEP-2026", "15/Apr/22") are parsed with CONVERT styles 106 / 1, which follow the
+    -- session language: fix it to English so a login with another default language parses the same
+    SET LANGUAGE us_english;
     DECLARE @batch UNIQUEIDENTIFIER = NEWID(), @t0 DATETIME2, @rows BIGINT, @log BIGINT;
 
     ---------------------------------------------------------------- weather_obs
@@ -313,8 +316,10 @@ BEGIN
                    -- WND: ddd,q,t,ssss,q  (speed tenths of m/s; 9999 = missing)
                    CASE WHEN SUBSTRING(b.WND,14,1) IN ('2','3','6','7') THEN NULL
                         ELSE NULLIF(TRY_CAST(SUBSTRING(b.WND,9,4) AS INT), 9999) / 10.0 END AS wind_ms,
-                   -- AA1: pp,dddd,c,q  (period hours, depth tenths of mm) - keep 1-hour totals only
+                   -- AA1: pp,dddd,c,q  (period hours, depth tenths of mm) - keep 1-hour totals only;
+                   -- q (position 11) 2/3/6/7 = suspect/erroneous, dropped like VIS / TMP / WND
                    CASE WHEN LEFT(b.AA1,2) = '01' AND SUBSTRING(b.AA1,4,4) <> '9999'
+                             AND SUBSTRING(b.AA1,11,1) NOT IN ('2','3','6','7')
                         THEN TRY_CAST(SUBSTRING(b.AA1,4,4) AS INT) / 10.0 END AS precip_1h_mm,
                    NULLIF(LEFT(b.MW1,2), '') AS mw_code,
                    NULLIF(LEFT(b.AW1,2), '') AS aw_code,

@@ -33,7 +33,8 @@ import json
 import sys
 from pathlib import Path
 
-csv.field_size_limit(sys.maxsize)
+# sys.maxsize overflows the C long on 64-bit Windows (Python <= 3.12)
+csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "Data" / "raw"

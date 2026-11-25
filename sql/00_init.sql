@@ -29,6 +29,64 @@ IF SCHEMA_ID('gold')   IS NULL EXEC('CREATE SCHEMA gold');
 IF SCHEMA_ID('audit')  IS NULL EXEC('CREATE SCHEMA audit');
 GO
 
+-- ------------------------------------------------------------------------------
+-- Upgrade from the old design (main before the redesign).
+-- A teammate's existing av_ready_saudi_dw still holds the old Star Schema, the
+-- semantic / ml layers and an audit.load_log without the "layer" column.
+-- Those objects depended on the generated datasets and are not used any more,
+-- so they are removed here. On a fresh database this block does nothing.
+-- ------------------------------------------------------------------------------
+DECLARE @sql NVARCHAR(MAX) = N'';
+
+-- old audit.load_log (no "layer" column, message NVARCHAR(500)): its rows only
+-- describe old-design loads, so it is recreated below with the new layout
+IF OBJECT_ID('audit.load_log') IS NOT NULL AND COL_LENGTH('audit.load_log', 'layer') IS NULL
+BEGIN
+    DROP TABLE audit.load_log;
+    PRINT 'Old audit.load_log dropped (recreated below with the layer column).';
+END;
+
+-- foreign keys that point to or from old tables (must go before the tables)
+SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(fk.parent_object_id)) + N'.'
+             + QUOTENAME(OBJECT_NAME(fk.parent_object_id)) + N' DROP CONSTRAINT ' + QUOTENAME(fk.name) + N';'
+FROM sys.foreign_keys fk
+WHERE OBJECT_SCHEMA_NAME(fk.parent_object_id)     IN ('gold', 'semantic', 'ml', 'quality')
+   OR OBJECT_SCHEMA_NAME(fk.referenced_object_id) IN ('gold', 'semantic', 'ml', 'quality');
+EXEC sys.sp_executesql @sql;
+
+-- views and procedures of the old layers
+SET @sql = N'';
+SELECT @sql += N'DROP ' + CASE o.type WHEN 'V' THEN N'VIEW ' ELSE N'PROCEDURE ' END
+             + QUOTENAME(SCHEMA_NAME(o.schema_id)) + N'.' + QUOTENAME(o.name) + N';'
+FROM sys.objects o
+WHERE o.type IN ('V', 'P')
+  AND (SCHEMA_NAME(o.schema_id) IN ('semantic', 'ml', 'quality')
+       OR (SCHEMA_NAME(o.schema_id) = 'gold' AND o.type = 'V')
+       OR (SCHEMA_NAME(o.schema_id) = 'bronze'
+           AND o.name IN ('v_av_telemetry_load', 'v_sa_traffic_accidents_load', 'v_sa_weather_load')));
+EXEC sys.sp_executesql @sql;
+
+-- old tables: every gold table except the one Gold table, the semantic / ml layers,
+-- and the old Bronze / Silver tables of the generated design
+SET @sql = N'';
+SELECT @sql += N'DROP TABLE ' + QUOTENAME(SCHEMA_NAME(t.schema_id)) + N'.' + QUOTENAME(t.name) + N';'
+FROM sys.tables t
+WHERE (SCHEMA_NAME(t.schema_id) = 'gold' AND t.name <> 'av_readiness_region_month')
+   OR SCHEMA_NAME(t.schema_id) IN ('semantic', 'ml', 'quality')
+   OR (SCHEMA_NAME(t.schema_id) IN ('bronze', 'silver')
+       AND t.name IN ('av_telemetry', 'sa_traffic_accidents', 'sa_weather'));
+IF @sql <> N''
+BEGIN
+    EXEC sys.sp_executesql @sql;
+    PRINT 'Old-design tables removed.';
+END;
+
+-- empty old schemas
+IF SCHEMA_ID('semantic') IS NOT NULL EXEC('DROP SCHEMA semantic');
+IF SCHEMA_ID('ml')       IS NOT NULL EXEC('DROP SCHEMA ml');
+IF SCHEMA_ID('quality')  IS NOT NULL EXEC('DROP SCHEMA quality');
+GO
+
 -- One row per load step, written by every load procedure.
 IF OBJECT_ID('audit.load_log') IS NULL
 CREATE TABLE audit.load_log (

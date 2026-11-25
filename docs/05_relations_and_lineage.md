@@ -26,7 +26,7 @@ is learned in the US and transferred through the conditions both places share.
 | 5 | AV failures | California DMV AV mileage reports | Dec 2020 – Nov 2024 | vehicle × month | US | exposure (fleet miles) |
 | 6 | AV crashes | NHTSA Standing General Order — ADS incident reports (2021–2025 archive + current file) | 2021–2025 used | one crash report | US | events with structured weather / lighting / road type |
 
-Not loaded (kept in `Data/raw/_excluded` or outside the pipeline): KAPSARC 2016–2019 (outside the period),
+Considered and not used (not in the data bundle): KAPSARC 2016–2019 (outside the period),
 UK STATS19, Open-Meteo and CAMS model output (modelled, not observed), Saudi Open Data portal files
 (annual totals already covered by GASTAT, or too small), OSM extract.
 

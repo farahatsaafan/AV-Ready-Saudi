@@ -3,6 +3,22 @@
 Raw files live in `Data/raw/` (not in Git — `Data/` is ignored). Each download folder has a `MANIFEST.csv`
 with the SHA-256 of every file.
 
+## Download
+
+**Google Drive — [New Data](https://drive.google.com/drive/folders/1hmh-0XqcQ9MZ5juEkdRgR7CMA9GsERj3):**
+`AV-Ready-Saudi_Data_raw.zip` (36 MB, 114 files). Unzip it **in the project folder**; it already contains the
+`Data/raw/...` paths below, so nothing has to be moved:
+
+```
+AV-Ready-Saudi/Data/raw/noaa_global_hourly/2021 ... 2025/   (17 station CSVs + MANIFEST per year)
+AV-Ready-Saudi/Data/raw/gastat/                              (4 xlsx)
+AV-Ready-Saudi/Data/raw/ca_dmv_disengagements/               (8 csv)
+AV-Ready-Saudi/Data/raw/ca_dmv_mileage/                      (8 csv)
+AV-Ready-Saudi/Data/raw/nhtsa_sgo/                           (2 csv + 2 pdf)
+```
+
+The bundle holds exactly the files the pipeline reads, nothing else.
+
 | Folder in `Data/raw/` | Source | Files | Link |
 |---|---|---|---|
 | `noaa_global_hourly/<year>/` | NOAA NCEI Global Hourly (Integrated Surface Database), station CSVs 2021–2025 | 85 (17 stations × 5 years) | https://www.ncei.noaa.gov/data/global-hourly/access/ (mirror: `noaa-global-hourly-pds` on AWS) |
@@ -35,8 +51,8 @@ with the SHA-256 of every file.
 Notes
 - NOAA data for Saudi stations are the stations' own observations (METAR/SYNOP) archived by NOAA.
 - The NOAA mirror used ends in August 2025.
-- `nhtsa_sgo/` was previously under `_excluded/`; it is now part of the design.
-- Excluded and not loaded: `_excluded/kapsarc` (2016–2019), `_excluded/uk_dft_stats19`, Open-Meteo and CAMS files
-  (model output), OSM extract.
+- Considered and dropped (not in the bundle, not loaded): KAPSARC accidents (2016–2019, outside the 2021–2025
+  range), UK DfT STATS19 (accidents must be Saudi only), Open-Meteo and CAMS (computed by weather / atmosphere
+  models, not measured by a station), OSM road extract (not used by the design).
 
 See `docs/05_relations_and_lineage.md` for how the sources relate and reach the single Gold table.
