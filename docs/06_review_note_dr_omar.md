@@ -43,7 +43,7 @@ Your suggested comparison (accidents under bad vs good weather) is in `sql/04_an
 ## 5. Result of the run
 
 Bronze 1 066 423 rows from 107 files → Silver (with reject log and reconciliation) → Gold 780 rows.
-29 quality checks, all PASS; the national accident totals equal GASTAT's published totals.
+32 quality checks, all PASS; the national accident totals equal GASTAT's published totals.
 
 ## 6. Question for you
 

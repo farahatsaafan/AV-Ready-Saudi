@@ -52,9 +52,10 @@ Typed columns (INT, DECIMAL, DATE, DATETIME2, TIME, BIT), primary keys on every 
 
 ## 6. Reconciliation (`sql/quality/02_silver_reconciliation.sql`) — all PASS
 
-- Weather: 927 141 Bronze = 920 127 Silver + 0 rejected + SOD/SOM summaries + duplicate reports + reports outside 2021–2025.
+- Weather: 927 141 Bronze = 920 127 Silver + 0 rejected + SOD/SOM summaries + blank report type + unknown station + duplicate reports + reports outside 2021–2025 (each part counted on its own; the check passes only when they add up exactly).
+- Mileage: every month cell of every DMV report = a Silver row, a rejected cell, or the same VIN/month in a second file.
 - Disengagements: 49 124 Bronze = 49 066 Silver + 58 rejected.
-- Crashes: 4 087 Bronze = 3 244 Silver + 20 rejected + older report versions + same-incident duplicates.
+- Crashes: 4 087 Bronze = 3 244 Silver + 20 rejected + blank Report ID + older report versions + same-incident duplicates.
 - Accidents: 65 rows = 13 regions × 5 years, 0 rejected cells.
 - National totals equal GASTAT's published totals: serious accidents 2023 16 534 · 2024 17 231 · 2025 17 805;
   deaths 2023 4 423 · 2024 4 282 · 2025 4 448.
