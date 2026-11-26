@@ -36,7 +36,7 @@ INSERT @r SELECT 'NHTSA crashes -> gold av_rr_crash_*', 'not null',
        IIF(MAX(av_rr_crash_rain) IS NULL, 'null', 'set'), IIF(MAX(av_rr_crash_rain) IS NULL, 0, 1)
 FROM gold.av_readiness_region_month;
 INSERT @r SELECT 'DMV disengagements + mileage -> gold av_rr_diseng_*', 'not null',
-       IIF(MAX(av_rr_diseng_obscured_day) IS NULL, 'null', 'set'), IIF(MAX(av_rr_diseng_obscured_day) IS NULL, 0, 1)
+       IIF(MAX(av_rr_diseng_fog_haze_day) IS NULL, 'null', 'set'), IIF(MAX(av_rr_diseng_fog_haze_day) IS NULL, 0, 1)
 FROM gold.av_readiness_region_month;
 
 INSERT audit.dq_result (layer, check_name, expected, actual, passed)

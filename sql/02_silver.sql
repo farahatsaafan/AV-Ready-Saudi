@@ -267,7 +267,7 @@ CREATE TABLE silver.nhtsa_crash (
     lighting_raw      NVARCHAR(100) NULL,
     w_clear  BIT NOT NULL, w_cloudy BIT NOT NULL, w_rain BIT NOT NULL, w_snow BIT NOT NULL,
     w_fog_smoke_haze BIT NOT NULL, w_dust BIT NOT NULL, w_wind BIT NOT NULL, w_unknown BIT NOT NULL,
-    weather_bucket    VARCHAR(10)   NOT NULL,   -- normal / rain / obscured / unknown
+    weather_bucket    VARCHAR(10)   NOT NULL,   -- dust / fog_haze / rain / normal / unknown
     is_night          BIT           NULL,
     in_scope          BIT           NOT NULL,   -- state CA/AZ/TX and incident year 2021-2025
     dw_create_date    DATETIME2     NOT NULL DEFAULT SYSDATETIME()
@@ -647,7 +647,8 @@ BEGIN
             FROM one WHERE rn_s = 1
         )
         SELECT d.*,
-               CASE WHEN d.wf = 'Y' OR d.wd = 'Y' THEN 'obscured'
+               CASE WHEN d.wd = 'Y' THEN 'dust'
+                    WHEN d.wf = 'Y' THEN 'fog_haze'
                     WHEN d.wr = 'Y' OR d.wsn = 'Y' THEN 'rain'
                     WHEN d.wc = 'Y' OR d.wcl = 'Y' OR d.wpc = 'Y' OR d.ww = 'Y' THEN 'normal'
                     ELSE 'unknown' END AS wbucket

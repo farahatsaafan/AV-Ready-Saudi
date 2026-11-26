@@ -144,6 +144,12 @@ def silver_weather(counts: dict) -> pd.DataFrame:
     return b
 
 
+def day_type(dust, fogh, rain):
+    """>= 3 obscured hours -> dust or fog_haze, whichever had more hours (ties -> dust); else rain; else normal."""
+    return np.where(dust + fogh >= 3, np.where(dust >= fogh, "dust", "fog_haze"),
+                    np.where(rain >= 1, "rain", "normal"))
+
+
 def prep_hours(wx: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     wx = wx.copy()
     wx["hour_local"] = wx["obs_local"].dt.floor("h")
@@ -154,12 +160,14 @@ def prep_hours(wx: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         is_fog=("is_fog", "max"), is_low_vis=("is_low_vis", "max"), is_obscured=("obsc", "max"),
         is_rain=("is_rain", "max"), night=("is_night", "mean")).reset_index()
     h["is_night"] = h["night"] >= 0.5
-    h["bucket"] = np.where(h["is_obscured"], "obscured", np.where(h["is_rain"], "rain", "normal"))
+    h["is_fog_haze"] = h["is_obscured"] & ~h["is_dust"]          # obscured hour without any dust report
+    h["bucket"] = np.where(h["is_dust"], "dust", np.where(h["is_fog_haze"], "fog_haze",
+                           np.where(h["is_rain"], "rain", "normal")))
     h["local_date"] = h["hour_local"].dt.normalize()
     d = h.groupby(["station_id", "local_date"]).agg(
-        hours=("bucket", "size"), dust_hours=("is_dust", "sum"), obscured_hours=("is_obscured", "sum"),
-        rain_hours=("is_rain", "sum")).reset_index()
-    d["day_type"] = np.where(d["obscured_hours"] >= 3, "obscured", np.where(d["rain_hours"] >= 1, "rain", "normal"))
+        hours=("bucket", "size"), dust_hours=("is_dust", "sum"), fog_haze_hours=("is_fog_haze", "sum"),
+        obscured_hours=("is_obscured", "sum"), rain_hours=("is_rain", "sum")).reset_index()
+    d["day_type"] = day_type(d["dust_hours"], d["fog_haze_hours"], d["rain_hours"])
     return h, d
 
 
@@ -253,8 +261,8 @@ def silver_nhtsa(counts: dict) -> pd.DataFrame:
     n = n.sort_values(["file_rank", "rid"]).drop_duplicates(
         ["Reporting Entity", "st", "city", "inc_month", "tkey"], keep="first")
     n = n[n["inc_month"].notna()]
-    n["bucket"] = np.where(n["wf"] | n["wd"], "obscured", np.where(n["wr"] | n["wsn"], "rain",
-                  np.where(n["wc"] | n["wcl"] | n["wpc"] | n["ww"], "normal", "unknown")))
+    n["bucket"] = np.where(n["wd"], "dust", np.where(n["wf"], "fog_haze", np.where(n["wr"] | n["wsn"], "rain",
+                  np.where(n["wc"] | n["wcl"] | n["wpc"] | n["ww"], "normal", "unknown"))))
     light = n["Lighting"].str.strip()
     night = pd.Series(np.nan, index=n.index)
     night[light.str.startswith("Daylight")] = 0
@@ -288,7 +296,7 @@ def relative_risks(h: pd.DataFrame, d: pd.DataFrame, crash: pd.DataFrame,
     exp = (es.loc[w.index].mul(w, axis=0)).sum()
     ev = ck["bucket"].value_counts(normalize=True); evn = ck["bucket"].value_counts()
     base = ev.get("normal", 0) / exp.get("normal", np.nan)
-    for lv in ["normal", "rain", "obscured"]:
+    for lv in ["normal", "rain", "fog_haze", "dust"]:
         rows.append(("nhtsa_crash", "weather", lv, int(evn.get(lv, 0)), ev.get(lv, 0), np.nan, exp.get(lv, np.nan),
                      (ev.get(lv, 0) / exp.get(lv, np.nan)) / base))
     # light
@@ -303,8 +311,10 @@ def relative_risks(h: pd.DataFrame, d: pd.DataFrame, crash: pd.DataFrame,
         rows.append(("nhtsa_crash", "light", lv, int(evn.get(lv, 0)), ev.get(lv, 0), np.nan, exp.get(lv), (ev.get(lv, 0) / exp.get(lv)) / base))
     # disengagements
     ca = d.merge(STATIONS[STATIONS.us_state == "CA"][["station_id"]], on="station_id")
-    cad = ca.groupby("local_date").agg(o=("obscured_hours", "max"), r=("rain_hours", "max")).reset_index()
-    cad["day_type"] = np.where(cad["o"] >= 3, "obscured", np.where(cad["r"] >= 1, "rain", "normal"))
+    # California day = the worse of LAX and SFO: max hours of each kind over the two stations
+    cad = ca.groupby("local_date").agg(du=("dust_hours", "max"), fh=("fog_haze_hours", "max"),
+                                       r=("rain_hours", "max")).reset_index()
+    cad["day_type"] = day_type(cad["du"], cad["fh"], cad["r"])
     mm = miles.groupby("month_start")["miles"].sum()
     cad["ms"] = cad["local_date"].dt.to_period("M").dt.to_timestamp()
     cad = cad[cad["ms"].isin(mm.index)]
@@ -313,7 +323,7 @@ def relative_risks(h: pd.DataFrame, d: pd.DataFrame, crash: pd.DataFrame,
     cad["n"] = cad["local_date"].map(nd).fillna(0)
     agg = cad.groupby("day_type").agg(events=("n", "sum"), exposure=("miles_day", "sum"))
     base = agg.loc["normal", "events"] / agg.loc["normal", "exposure"]
-    for lv in ["normal", "rain", "obscured"]:
+    for lv in ["normal", "rain", "fog_haze", "dust"]:
         e = agg["events"].get(lv, 0); x = agg["exposure"].get(lv, np.nan)
         rows.append(("dmv_disengagement", "weather", lv, int(e), e / agg["events"].sum(), x, x / agg["exposure"].sum(), (e / x) / base))
     return pd.DataFrame(rows, columns=["event_source", "factor", "level", "events", "event_share", "exposure",
@@ -343,12 +353,13 @@ def main() -> None:
         hours=("bucket", "size"), temp_mean_c=("temp_c", "mean"), temp_max_c=("temp_max_c", "max"),
         wind_max_ms=("wind_max_ms", "max"), rain_mm=("precip_mm", "sum"), dust=("is_dust", "sum"),
         haze=("is_haze", "sum"), fog=("is_fog", "sum"), lowvis=("is_low_vis", "sum"), obsc=("is_obscured", "sum"),
-        rain=("bucket", lambda s: (s == "rain").sum()), normal=("bucket", lambda s: (s == "normal").sum()),
+        fogh=("is_fog_haze", "sum"), rain=("bucket", lambda s: (s == "rain").sum()), normal=("bucket", lambda s: (s == "normal").sum()),
         night=("is_night", "sum")).reset_index()
     dd = d.copy(); dd["month_start"] = dd["local_date"].dt.to_period("M").dt.to_timestamp()
     dm = dd.groupby(["station_id", "month_start"]).agg(
         days=("day_type", "size"), dust_days=("dust_hours", lambda s: (s > 0).sum()),
-        obscured_days=("day_type", lambda s: (s == "obscured").sum()), rain_days=("day_type", lambda s: (s == "rain").sum()),
+        dust_type_days=("day_type", lambda s: (s == "dust").sum()),
+        fog_haze_days=("day_type", lambda s: (s == "fog_haze").sum()), rain_days=("day_type", lambda s: (s == "rain").sum()),
         normal_days=("day_type", lambda s: (s == "normal").sum())).reset_index()
     m = hm.merge(dm, on=["station_id", "month_start"])
     cal = pd.MultiIndex.from_product([STATIONS[STATIONS.country == "SA"]["region_code"],
@@ -358,12 +369,17 @@ def main() -> None:
     g["year"] = g["month_start"].dt.year
     g = g.merge(acc.rename(columns={"year": "year"}), on=["region_code", "year"], how="left")
     hrs = g["hours"].replace(0, np.nan); dys = g["days"].replace(0, np.nan)
-    for c in ["dust", "haze", "fog", "lowvis", "obsc", "rain", "normal", "night"]:
+    g["obscured_days"] = g["dust_type_days"] + g["fog_haze_days"]
+    for c in ["dust", "haze", "fog", "lowvis", "obsc", "fogh", "rain", "normal", "night"]:
         g["share_" + c] = g[c] / hrs
+    # dust hours / days enter with their own relative risk only if the AV data has >= 30 dust events;
+    # otherwise R() returns 1 (neutral) and the dust share stays visible in its own column
     g["av_crash_risk_index"] = (g["share_normal"] + g["share_rain"] * R("nhtsa_crash", "weather", "rain")
-                                + g["share_obsc"] * R("nhtsa_crash", "weather", "obscured"))
+                                + g["share_fogh"] * R("nhtsa_crash", "weather", "fog_haze")
+                                + g["share_dust"] * R("nhtsa_crash", "weather", "dust"))
     g["av_diseng_risk_index"] = (g["normal_days"] / dys + g["rain_days"] / dys * R("dmv_disengagement", "weather", "rain")
-                                 + g["obscured_days"] / dys * R("dmv_disengagement", "weather", "obscured"))
+                                 + g["fog_haze_days"] / dys * R("dmv_disengagement", "weather", "fog_haze")
+                                 + g["dust_type_days"] / dys * R("dmv_disengagement", "weather", "dust"))
     g.to_csv(OUT / "gold_reference.csv", index=False)
     counts["gold.av_readiness_region_month"] = len(g)
     pd.Series(counts, name="rows").to_csv(OUT / "counts.csv")
@@ -384,7 +400,7 @@ def main() -> None:
     print(pd.Series(counts).to_string())
     print(rr.to_string())
     print(s.to_string())
-    print(g[["region_code", "month_start", "hours", "share_dust", "share_obsc", "share_rain", "share_night",
+    print(g[["region_code", "month_start", "hours", "share_dust", "share_fogh", "share_obsc", "share_rain", "share_night",
              "serious", "av_crash_risk_index", "av_diseng_risk_index"]].describe().to_string())
 
 

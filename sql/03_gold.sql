@@ -8,8 +8,10 @@
 -- How the three data families meet (relations, see docs/05_relations_and_lineage.md):
 --   Weather  -> Accidents : same region_code + same year      (both Saudi, observed)
 --   Weather  -> AV events : same condition vocabulary
---                           (normal / rain / obscured = dust, haze, fog, visibility < 5 km;
---                            day / night by sun position)
+--                           (normal / rain / fog_haze = fog, haze, mist, visibility < 5 km without
+--                            dust / dust = dust or sand reported; day / night by sun position).
+--                           Dust and fog/haze are kept apart: Saudi obscured hours are mostly dust,
+--                           California's are fog and mist, so a fog risk must not be applied to dust.
 --   AV crashes (NHTSA) and disengagements (DMV) are turned into relative risks per
 --   condition using US weather from the same places/dates as the exposure; the risks
 --   are then applied to each Saudi region-month's own mix of conditions.
@@ -43,9 +45,10 @@ CREATE TABLE prep.weather_station_hour (
     is_fog       BIT NOT NULL,
     is_low_vis   BIT NOT NULL,
     is_obscured  BIT NOT NULL,   -- dust OR haze OR fog OR visibility < 5 km
+    is_fog_haze  BIT NOT NULL,   -- obscured hour WITHOUT any dust report (fog, haze/smoke, mist, low visibility)
     is_rain      BIT NOT NULL,
     is_night     BIT NOT NULL,
-    hour_bucket  VARCHAR(10) NOT NULL,   -- obscured > rain > normal
+    hour_bucket  VARCHAR(10) NOT NULL,   -- dust > fog_haze > rain > normal
     PRIMARY KEY (station_id, hour_local)
 );
 
@@ -55,9 +58,11 @@ CREATE TABLE prep.weather_station_day (
     local_date      DATE     NOT NULL,
     hours_observed  INT      NOT NULL,
     dust_hours      INT      NOT NULL,
+    fog_haze_hours  INT      NOT NULL,
     obscured_hours  INT      NOT NULL,
     rain_hours      INT      NOT NULL,
-    day_type        VARCHAR(10) NOT NULL, -- obscured (>=3 obscured hours) > rain (>=1 rain hour) > normal
+    day_type        VARCHAR(10) NOT NULL, -- >=3 obscured hours: dust or fog_haze (whichever has more hours,
+                                          -- ties -> dust); else rain (>=1 rain hour); else normal
     PRIMARY KEY (station_id, local_date)
 );
 
@@ -67,9 +72,10 @@ CREATE TABLE prep.saudi_region_month (
     month_start     DATE     NOT NULL,
     hours_observed  INT, temp_mean_c DECIMAL(5,1), temp_max_c DECIMAL(5,1), wind_max_ms DECIMAL(5,1),
     rain_mm DECIMAL(8,1),
-    dust_hours INT, haze_hours INT, fog_hours INT, low_vis_hours INT, obscured_hours INT,
+    dust_hours INT, haze_hours INT, fog_hours INT, low_vis_hours INT, obscured_hours INT, fog_haze_hours INT,
     rain_hours INT, normal_hours INT, night_hours INT,
-    days_observed INT, dust_days INT, obscured_days INT, rain_days INT, normal_days INT,
+    days_observed INT, dust_days INT, dust_type_days INT, fog_haze_days INT, obscured_days INT,
+    rain_days INT, normal_days INT,
     PRIMARY KEY (region_code, month_start)
 );
 
@@ -77,7 +83,7 @@ CREATE TABLE prep.saudi_region_month (
 CREATE TABLE prep.av_relative_risk (
     event_source    VARCHAR(20) NOT NULL,   -- nhtsa_crash / dmv_disengagement
     factor          VARCHAR(10) NOT NULL,   -- weather / light
-    level           VARCHAR(10) NOT NULL,   -- normal, rain, obscured / day, night
+    level           VARCHAR(10) NOT NULL,   -- normal, rain, fog_haze, dust / day, night
     events          INT         NOT NULL,
     event_share     FLOAT       NULL,
     exposure        FLOAT       NULL,       -- weighted hours (crash) or fleet miles (disengagement)
@@ -109,13 +115,16 @@ CREATE TABLE gold.av_readiness_region_month (
     share_haze_hours               DECIMAL(6,4)  NULL,
     share_fog_hours                DECIMAL(6,4)  NULL,
     share_low_vis_hours            DECIMAL(6,4)  NULL,
-    share_obscured_hours           DECIMAL(6,4)  NULL,
+    share_obscured_hours           DECIMAL(6,4)  NULL,   -- dust + fog/haze
+    share_fog_haze_hours           DECIMAL(6,4)  NULL,   -- obscured hours without dust
     share_rain_hours               DECIMAL(6,4)  NULL,
     share_normal_hours             DECIMAL(6,4)  NULL,
     share_night_hours              DECIMAL(6,4)  NULL,
     days_observed                  INT           NULL,
-    dust_days                      INT           NULL,
-    obscured_days                  INT           NULL,
+    dust_days                      INT           NULL,   -- days with at least one dust hour
+    dust_type_days                 INT           NULL,   -- day type = dust
+    fog_haze_days                  INT           NULL,   -- day type = fog_haze
+    obscured_days                  INT           NULL,   -- dust_type_days + fog_haze_days
     rain_days                      INT           NULL,
     normal_days                    INT           NULL,
     -- Saudi accidents (GASTAT, annual per region; same value on the 12 months of a year)
@@ -128,10 +137,12 @@ CREATE TABLE gold.av_readiness_region_month (
     acc_serious_month_avg          DECIMAL(9,2)  NULL,   -- annual / 12 (even split, not observed monthly)
     -- AV side (NHTSA crashes + CA DMV disengagements & mileage + US analog weather)
     av_rr_crash_rain               DECIMAL(9,4)  NULL,
-    av_rr_crash_obscured           DECIMAL(9,4)  NULL,
+    av_rr_crash_fog_haze           DECIMAL(9,4)  NULL,
+    av_rr_crash_dust               DECIMAL(9,4)  NULL,   -- NULL: too few AV crashes in dust (evidence rule)
     av_rr_crash_night              DECIMAL(9,4)  NULL,
     av_rr_diseng_rain_day          DECIMAL(9,4)  NULL,
-    av_rr_diseng_obscured_day      DECIMAL(9,4)  NULL,
+    av_rr_diseng_fog_haze_day      DECIMAL(9,4)  NULL,
+    av_rr_diseng_dust_day          DECIMAL(9,4)  NULL,   -- NULL: no dust days in the California AV data
     av_crash_risk_index            DECIMAL(9,4)  NULL,   -- 1 = month with only normal-weather hours
     av_diseng_risk_index           DECIMAL(9,4)  NULL,   -- 1 = all-normal-days month
     -- lineage
@@ -169,9 +180,12 @@ BEGIN
                MAX(CAST(is_dust AS INT)), MAX(CAST(is_haze AS INT)), MAX(CAST(is_fog AS INT)),
                MAX(CAST(is_low_vis AS INT)),
                MAX(CASE WHEN is_dust = 1 OR is_haze = 1 OR is_fog = 1 OR is_low_vis = 1 THEN 1 ELSE 0 END),
+               CASE WHEN MAX(CAST(is_dust AS INT)) = 0
+                         AND MAX(CASE WHEN is_haze = 1 OR is_fog = 1 OR is_low_vis = 1 THEN 1 ELSE 0 END) = 1 THEN 1 ELSE 0 END,
                MAX(CAST(is_rain AS INT)),
                CASE WHEN AVG(CAST(is_night AS FLOAT)) >= 0.5 THEN 1 ELSE 0 END,
-               CASE WHEN MAX(CASE WHEN is_dust = 1 OR is_haze = 1 OR is_fog = 1 OR is_low_vis = 1 THEN 1 ELSE 0 END) = 1 THEN 'obscured'
+               CASE WHEN MAX(CAST(is_dust AS INT)) = 1 THEN 'dust'
+                    WHEN MAX(CASE WHEN is_haze = 1 OR is_fog = 1 OR is_low_vis = 1 THEN 1 ELSE 0 END) = 1 THEN 'fog_haze'
                     WHEN MAX(CAST(is_rain AS INT)) = 1 THEN 'rain' ELSE 'normal' END
         FROM silver.weather_obs
         CROSS APPLY (SELECT DATEADD(hour, DATEDIFF(hour, CAST('2000-01-01' AS DATETIME2(0)), obs_local),
@@ -180,9 +194,10 @@ BEGIN
 
         -------------------------------------------------- 2. station-day
         INSERT prep.weather_station_day
-        SELECT station_id, local_date, COUNT(*), SUM(CAST(is_dust AS INT)), SUM(CAST(is_obscured AS INT)),
-               SUM(CAST(is_rain AS INT)),
-               CASE WHEN SUM(CAST(is_obscured AS INT)) >= 3 THEN 'obscured'
+        SELECT station_id, local_date, COUNT(*), SUM(CAST(is_dust AS INT)), SUM(CAST(is_fog_haze AS INT)),
+               SUM(CAST(is_obscured AS INT)), SUM(CAST(is_rain AS INT)),
+               CASE WHEN SUM(CAST(is_obscured AS INT)) >= 3
+                    THEN CASE WHEN SUM(CAST(is_dust AS INT)) >= SUM(CAST(is_fog_haze AS INT)) THEN 'dust' ELSE 'fog_haze' END
                     WHEN SUM(CAST(is_rain AS INT)) >= 1 THEN 'rain' ELSE 'normal' END
         FROM prep.weather_station_hour
         GROUP BY station_id, local_date;
@@ -195,6 +210,7 @@ BEGIN
                    SUM(CAST(h.is_dust AS INT)) AS dust_hours, SUM(CAST(h.is_haze AS INT)) AS haze_hours,
                    SUM(CAST(h.is_fog AS INT)) AS fog_hours, SUM(CAST(h.is_low_vis AS INT)) AS low_vis_hours,
                    SUM(CAST(h.is_obscured AS INT)) AS obscured_hours,
+                   SUM(CAST(h.is_fog_haze AS INT)) AS fog_haze_hours,
                    SUM(CASE WHEN h.hour_bucket = 'rain' THEN 1 ELSE 0 END) AS rain_hours,
                    SUM(CASE WHEN h.hour_bucket = 'normal' THEN 1 ELSE 0 END) AS normal_hours,
                    SUM(CAST(h.is_night AS INT)) AS night_hours
@@ -205,7 +221,9 @@ BEGIN
             SELECT d.station_id, DATEFROMPARTS(YEAR(d.local_date), MONTH(d.local_date), 1) AS month_start,
                    COUNT(*) AS days_observed,
                    SUM(CASE WHEN d.dust_hours > 0 THEN 1 ELSE 0 END) AS dust_days,
-                   SUM(CASE WHEN d.day_type = 'obscured' THEN 1 ELSE 0 END) AS obscured_days,
+                   SUM(CASE WHEN d.day_type = 'dust' THEN 1 ELSE 0 END) AS dust_type_days,
+                   SUM(CASE WHEN d.day_type = 'fog_haze' THEN 1 ELSE 0 END) AS fog_haze_days,
+                   SUM(CASE WHEN d.day_type IN ('dust', 'fog_haze') THEN 1 ELSE 0 END) AS obscured_days,
                    SUM(CASE WHEN d.day_type = 'rain' THEN 1 ELSE 0 END) AS rain_days,
                    SUM(CASE WHEN d.day_type = 'normal' THEN 1 ELSE 0 END) AS normal_days
             FROM prep.weather_station_day d
@@ -214,8 +232,9 @@ BEGIN
         INSERT prep.saudi_region_month
         SELECT hm.region_code, hm.station_id, hm.month_start, hm.hours_observed, hm.temp_mean_c, hm.temp_max_c,
                hm.wind_max_ms, hm.rain_mm, hm.dust_hours, hm.haze_hours, hm.fog_hours, hm.low_vis_hours,
-               hm.obscured_hours, hm.rain_hours, hm.normal_hours, hm.night_hours,
-               dm.days_observed, dm.dust_days, dm.obscured_days, dm.rain_days, dm.normal_days
+               hm.obscured_hours, hm.fog_haze_hours, hm.rain_hours, hm.normal_hours, hm.night_hours,
+               dm.days_observed, dm.dust_days, dm.dust_type_days, dm.fog_haze_days, dm.obscured_days,
+               dm.rain_days, dm.normal_days
         FROM hm JOIN dm ON dm.station_id = hm.station_id AND dm.month_start = hm.month_start;
 
         -------------------------------------------------- 4a. AV crash relative risk (NHTSA x US weather)
@@ -236,7 +255,7 @@ BEGIN
         ), ev AS (
             SELECT weather_bucket AS level, COUNT(*) AS events, COUNT(*) * 1.0 / SUM(COUNT(*)) OVER () AS event_share
             FROM crash WHERE weather_bucket <> 'unknown' GROUP BY weather_bucket
-        ), lv AS (SELECT level FROM (VALUES ('normal'), ('rain'), ('obscured')) v(level))
+        ), lv AS (SELECT level FROM (VALUES ('normal'), ('rain'), ('fog_haze'), ('dust')) v(level))
         INSERT prep.av_relative_risk (event_source, factor, level, events, event_share, exposure, exposure_share, relative_risk)
         SELECT 'nhtsa_crash', 'weather', lv.level, ISNULL(ev.events, 0), ISNULL(ev.event_share, 0), NULL, x.exposure_share,
                (ISNULL(ev.event_share, 0) / NULLIF(x.exposure_share, 0))
@@ -269,15 +288,18 @@ BEGIN
         FROM ev JOIN exp_w x ON x.level = ev.level;
 
         -------------------------------------------------- 4b. AV disengagement relative risk (DMV x CA weather)
-        -- California day type from LAX + SFO (obscured if either station had >= 3 obscured
-        -- hours, else rain if either had rain); exposure = fleet miles of the month spread evenly over its days
-        ;WITH ca_day AS (
-            SELECT d.local_date,
-                   CASE WHEN MAX(d.obscured_hours) >= 3 THEN 'obscured'
-                        WHEN MAX(d.rain_hours) >= 1 THEN 'rain' ELSE 'normal' END AS day_type
+        -- California day = the worse of LAX and SFO (max hours of each kind over the two stations),
+        -- then the same day-type rule as Saudi days; exposure = fleet miles of the month spread evenly over its days
+        ;WITH ca_max AS (
+            SELECT d.local_date, MAX(d.dust_hours) AS du, MAX(d.fog_haze_hours) AS fh, MAX(d.rain_hours) AS rn
             FROM prep.weather_station_day d
             JOIN silver.dim_station s ON s.station_id = d.station_id AND s.us_state = 'CA'
             GROUP BY d.local_date
+        ), ca_day AS (
+            SELECT local_date,
+                   CASE WHEN du + fh >= 3 THEN CASE WHEN du >= fh THEN 'dust' ELSE 'fog_haze' END
+                        WHEN rn >= 1 THEN 'rain' ELSE 'normal' END AS day_type
+            FROM ca_max
         ), miles_month AS (
             SELECT month_start, SUM(miles) AS miles FROM silver.dmv_mileage_monthly GROUP BY month_start
         ), day_exp AS (
@@ -291,7 +313,7 @@ BEGIN
             SELECT e.day_type AS level, SUM(ISNULL(d.n, 0)) AS events, SUM(CAST(e.miles_day AS FLOAT)) AS exposure
             FROM day_exp e LEFT JOIN dis d ON d.event_date = e.local_date
             GROUP BY e.day_type
-        ), lv AS (SELECT level FROM (VALUES ('normal'), ('rain'), ('obscured')) v(level))
+        ), lv AS (SELECT level FROM (VALUES ('normal'), ('rain'), ('fog_haze'), ('dust')) v(level))
         INSERT prep.av_relative_risk (event_source, factor, level, events, event_share, exposure, exposure_share, relative_risk)
         SELECT 'dmv_disengagement', 'weather', lv.level, ISNULL(a.events, 0),
                ISNULL(a.events, 0) * 1.0 / NULLIF((SELECT SUM(events) FROM agg), 0),
@@ -307,10 +329,12 @@ BEGIN
 
         -------------------------------------------------- 5. Gold: region x month
         DECLARE @rr_c_rain FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='nhtsa_crash' AND factor='weather' AND level='rain' AND used_in_index = 1),
-                @rr_c_obs  FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='nhtsa_crash' AND factor='weather' AND level='obscured' AND used_in_index = 1),
+                @rr_c_fh   FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='nhtsa_crash' AND factor='weather' AND level='fog_haze' AND used_in_index = 1),
+                @rr_c_dust FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='nhtsa_crash' AND factor='weather' AND level='dust' AND used_in_index = 1),
                 @rr_c_ngt  FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='nhtsa_crash' AND factor='light'   AND level='night' AND used_in_index = 1),
                 @rr_d_rain FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='dmv_disengagement' AND level='rain' AND used_in_index = 1),
-                @rr_d_obs  FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='dmv_disengagement' AND level='obscured' AND used_in_index = 1);
+                @rr_d_fh   FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='dmv_disengagement' AND level='fog_haze' AND used_in_index = 1),
+                @rr_d_dust FLOAT = (SELECT relative_risk FROM prep.av_relative_risk WHERE event_source='dmv_disengagement' AND level='dust' AND used_in_index = 1);
 
         ;WITH cal AS (
             SELECT r.region_code, r.region_name_en, r.region_name_ar, s.station_id,
@@ -327,11 +351,12 @@ BEGIN
             region_code, region_name_en, region_name_ar, weather_station_id, [year], [month], month_start, season,
             wx_hours_observed, wx_hours_in_month, wx_coverage_pct, temp_mean_c, temp_max_c, wind_max_ms, rain_mm,
             share_dust_hours, share_haze_hours, share_fog_hours, share_low_vis_hours, share_obscured_hours,
-            share_rain_hours, share_normal_hours, share_night_hours,
-            days_observed, dust_days, obscured_days, rain_days, normal_days,
+            share_fog_haze_hours, share_rain_hours, share_normal_hours, share_night_hours,
+            days_observed, dust_days, dust_type_days, fog_haze_days, obscured_days, rain_days, normal_days,
             acc_year_serious, acc_year_deaths, acc_year_injuries, acc_year_serious_within_cities,
             acc_year_serious_outside_cities, acc_share_outside_cities, acc_serious_month_avg,
-            av_rr_crash_rain, av_rr_crash_obscured, av_rr_crash_night, av_rr_diseng_rain_day, av_rr_diseng_obscured_day,
+            av_rr_crash_rain, av_rr_crash_fog_haze, av_rr_crash_dust, av_rr_crash_night,
+            av_rr_diseng_rain_day, av_rr_diseng_fog_haze_day, av_rr_diseng_dust_day,
             av_crash_risk_index, av_diseng_risk_index,
             src_weather, src_accidents, src_av, gold_batch_id)
         SELECT c.region_code, c.region_name_en, c.region_name_ar, c.station_id, c.y, c.m, c.month_start,
@@ -342,19 +367,25 @@ BEGIN
                w.temp_mean_c, w.temp_max_c, w.wind_max_ms, w.rain_mm,
                CAST(w.dust_hours / w.hrs AS DECIMAL(6,4)), CAST(w.haze_hours / w.hrs AS DECIMAL(6,4)),
                CAST(w.fog_hours / w.hrs AS DECIMAL(6,4)), CAST(w.low_vis_hours / w.hrs AS DECIMAL(6,4)),
-               CAST(w.obscured_hours / w.hrs AS DECIMAL(6,4)), CAST(w.rain_hours / w.hrs AS DECIMAL(6,4)),
+               CAST(w.obscured_hours / w.hrs AS DECIMAL(6,4)), CAST(w.fog_haze_hours / w.hrs AS DECIMAL(6,4)),
+               CAST(w.rain_hours / w.hrs AS DECIMAL(6,4)),
                CAST(w.normal_hours / w.hrs AS DECIMAL(6,4)), CAST(w.night_hours / w.hrs AS DECIMAL(6,4)),
-               w.days_observed, w.dust_days, w.obscured_days, w.rain_days, w.normal_days,
+               w.days_observed, w.dust_days, w.dust_type_days, w.fog_haze_days, w.obscured_days,
+               w.rain_days, w.normal_days,
                a.serious_accidents, a.deaths, a.injuries, a.serious_within_cities, a.serious_outside_cities,
                CAST(a.serious_outside_cities * 1.0 / NULLIF(a.serious_within_cities + a.serious_outside_cities, 0) AS DECIMAL(6,4)),
                CAST(a.serious_accidents / 12.0 AS DECIMAL(9,2)),
-               @rr_c_rain, @rr_c_obs, @rr_c_ngt, @rr_d_rain, @rr_d_obs,
+               @rr_c_rain, @rr_c_fh, @rr_c_dust, @rr_c_ngt, @rr_d_rain, @rr_d_fh, @rr_d_dust,
                -- weather part only: the night ratio is kept as a column but not multiplied in,
                -- because its exposure (hours of darkness) is not AV miles driven at night
+               -- dust gets its own relative risk only when the AV data has >= 30 dust events;
+               -- otherwise it is neutral (1) and its exposure stays visible in share_dust_hours
                CAST( w.normal_hours / w.hrs + w.rain_hours / w.hrs * ISNULL(@rr_c_rain, 1)
-                   + w.obscured_hours / w.hrs * ISNULL(@rr_c_obs, 1) AS DECIMAL(9,4)),
+                   + w.fog_haze_hours / w.hrs * ISNULL(@rr_c_fh, 1)
+                   + (w.obscured_hours - w.fog_haze_hours) / w.hrs * ISNULL(@rr_c_dust, 1) AS DECIMAL(9,4)),
                CAST( w.normal_days / w.dys + w.rain_days / w.dys * ISNULL(@rr_d_rain, 1)
-                   + w.obscured_days / w.dys * ISNULL(@rr_d_obs, 1) AS DECIMAL(9,4)),
+                   + w.fog_haze_days / w.dys * ISNULL(@rr_d_fh, 1)
+                   + w.dust_type_days / w.dys * ISNULL(@rr_d_dust, 1) AS DECIMAL(9,4)),
                N'NOAA NCEI Global Hourly station ' + c.station_id,
                a.source_files,
                N'NHTSA SGO ADS crashes; CA DMV disengagements + mileage; NOAA LAX/SFO/PHX/AUS',
