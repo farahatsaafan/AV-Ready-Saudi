@@ -24,7 +24,7 @@ Purpose: confirm the relations and the Gold design before the Gold re-review, an
 
 ```
 Weather (SA) ──region_code + year──► Accidents (SA)              direct, both Saudi
-Weather (SA) ──condition──► AV evidence (US)                       normal / rain / obscured (dust, haze, fog, <5 km), day / night
+Weather (SA) ──condition──► AV evidence (US)                       normal / rain / fog_haze / dust, day / night
 AV crashes   ──us_state──► US weather    (exposure)
 AV disengagements ──date──► California weather, ──month──► fleet miles   (exposure)
 ```
@@ -42,8 +42,8 @@ Your suggested comparison (accidents under bad vs good weather) is in `sql/04_an
 
 ## 5. Result of the run
 
-Bronze 1 066 423 rows from 107 files → Silver (with reject log and reconciliation) → Gold 780 rows.
-32 quality checks, all PASS; the national accident totals equal GASTAT's published totals.
+Bronze 1 067 099 rows from 108 files → Silver (with reject log and reconciliation) → Gold 780 rows.
+43 quality checks, all PASS (Bronze 11 · Silver 20 · Gold 11 · rollback 1); the independent pandas rebuild gives the same counts, relative risks and data shares; the national accident totals equal GASTAT's published totals.
 
 ## 6. Question for you
 
@@ -60,6 +60,6 @@ Silver (≈ 28 700 rows) — at the cost of losing hour-level dust detail.
 
 ## 7. Limitations we will state in the paper
 
-US AV data contains almost no dust (one crash), so dust enters only through the "obscured" group; exposure is weather
+US AV data contains no dust events, so dust is kept as its own condition with a neutral AV risk; exposure is weather
 time, not AV miles; accidents are annual; Saudi weather ends Aug 2025; the result is an evidence-based estimate, not a
 measurement.

@@ -13,6 +13,8 @@ INSERT @r SELECT 'bronze.gastat_cells: workbooks',              '4',  CAST(COUNT
 INSERT @r SELECT 'bronze.dmv_disengagements: report files',     '8',  CAST(COUNT(DISTINCT source_file) AS NVARCHAR), IIF(COUNT(DISTINCT source_file) = 8, 1, 0) FROM bronze.dmv_disengagements;
 INSERT @r SELECT 'bronze.dmv_mileage: report files',            '8',  CAST(COUNT(DISTINCT source_file) AS NVARCHAR), IIF(COUNT(DISTINCT source_file) = 8, 1, 0) FROM bronze.dmv_mileage;
 INSERT @r SELECT 'bronze.nhtsa_sgo_ads: files',                 '2',  CAST(COUNT(DISTINCT source_file) AS NVARCHAR), IIF(COUNT(DISTINCT source_file) = 2, 1, 0) FROM bronze.nhtsa_sgo_ads;
+INSERT @r SELECT 'bronze.gastat_population: census file', '1', CAST(COUNT(DISTINCT source_file) AS NVARCHAR), IIF(COUNT(DISTINCT source_file) = 1, 1, 0) FROM bronze.gastat_population;
+INSERT @r SELECT 'bronze.gastat_population: rows (2 x 2 x 13 regions x 13 years)', '676', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 676, 1, 0) FROM bronze.gastat_population;
 INSERT @r SELECT 'bronze.nhtsa_sgo_ads: row_json is valid JSON', '0 bad', CONCAT(SUM(IIF(ISJSON(row_json) = 1, 0, 1)), ' bad'), IIF(SUM(IIF(ISJSON(row_json) = 1, 0, 1)) = 0, 1, 0) FROM bronze.nhtsa_sgo_ads;
 INSERT @r SELECT 'bronze.dmv_mileage: months_json is valid JSON', '0 bad', CONCAT(SUM(IIF(ISJSON(months_json) = 1, 0, 1)), ' bad'), IIF(SUM(IIF(ISJSON(months_json) = 1, 0, 1)) = 0, 1, 0) FROM bronze.dmv_mileage;
 INSERT @r SELECT 'bronze: every row has a batch id', '0 missing',
@@ -20,12 +22,14 @@ INSERT @r SELECT 'bronze: every row has a batch id', '0 missing',
             + (SELECT COUNT(*) FROM bronze.gastat_cells WHERE load_batch_id IS NULL)
             + (SELECT COUNT(*) FROM bronze.dmv_disengagements WHERE load_batch_id IS NULL)
             + (SELECT COUNT(*) FROM bronze.dmv_mileage WHERE load_batch_id IS NULL)
-            + (SELECT COUNT(*) FROM bronze.nhtsa_sgo_ads WHERE load_batch_id IS NULL), ' missing'),
+            + (SELECT COUNT(*) FROM bronze.nhtsa_sgo_ads WHERE load_batch_id IS NULL)
+            + (SELECT COUNT(*) FROM bronze.gastat_population WHERE load_batch_id IS NULL), ' missing'),
        IIF((SELECT COUNT(*) FROM bronze.noaa_hourly WHERE load_batch_id IS NULL)
          + (SELECT COUNT(*) FROM bronze.gastat_cells WHERE load_batch_id IS NULL)
          + (SELECT COUNT(*) FROM bronze.dmv_disengagements WHERE load_batch_id IS NULL)
          + (SELECT COUNT(*) FROM bronze.dmv_mileage WHERE load_batch_id IS NULL)
-         + (SELECT COUNT(*) FROM bronze.nhtsa_sgo_ads WHERE load_batch_id IS NULL) = 0, 1, 0);
+         + (SELECT COUNT(*) FROM bronze.nhtsa_sgo_ads WHERE load_batch_id IS NULL)
+         + (SELECT COUNT(*) FROM bronze.gastat_population WHERE load_batch_id IS NULL) = 0, 1, 0);
 
 INSERT audit.dq_result (layer, check_name, expected, actual, passed)
 SELECT 'bronze', check_name, expected, actual, passed FROM @r;
@@ -36,5 +40,6 @@ SELECT 'bronze.noaa_hourly' AS tbl, COUNT_BIG(*) AS rows_loaded FROM bronze.noaa
 SELECT 'bronze.gastat_cells', COUNT_BIG(*) FROM bronze.gastat_cells UNION ALL
 SELECT 'bronze.dmv_disengagements', COUNT_BIG(*) FROM bronze.dmv_disengagements UNION ALL
 SELECT 'bronze.dmv_mileage', COUNT_BIG(*) FROM bronze.dmv_mileage UNION ALL
-SELECT 'bronze.nhtsa_sgo_ads', COUNT_BIG(*) FROM bronze.nhtsa_sgo_ads;
+SELECT 'bronze.nhtsa_sgo_ads', COUNT_BIG(*) FROM bronze.nhtsa_sgo_ads UNION ALL
+SELECT 'bronze.gastat_population', COUNT_BIG(*) FROM bronze.gastat_population;
 GO

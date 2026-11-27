@@ -48,7 +48,10 @@ STATIONS = pd.DataFrame([
 
 REGION_ALIAS = {"riyadh": "RIY", "makkah": "MAK", "madinah": "MED", "eastern": "EAS", "qassim": "QAS",
                 "hail": "HAI", "tabuk": "TAB", "northernborders": "NBR", "aljouf": "JOF", "aseer": "ASR",
-                "albaha": "BAH", "najran": "NAJ", "jazan": "JAZ"}
+                "albaha": "BAH", "najran": "NAJ", "jazan": "JAZ",
+                # Saudi Census 2022 spellings
+                "arriyadh": "RIY", "makkahalmukarramah": "MAK", "almadinahalmunawwarah": "MED",
+                "alqaseem": "QAS", "aljawf": "JOF", "albahah": "BAH"}
 SHEET_MAP = [
     ("Land_Transport_Statistics_2022", "17", "injuries", 2021, 3, 8, 20),
     ("Land_Transport_Statistics_2022", "17", "injuries", 2022, 4, 8, 20),
@@ -236,6 +239,23 @@ def silver_roads(counts: dict) -> pd.DataFrame:
     return p
 
 
+def silver_population(counts: dict) -> pd.DataFrame:
+    """GASTAT Census 2022 table: population per region and year (years are written in Arabic-Indic digits)."""
+    b = read_tsv("gastat_population.tsv")
+    counts["bronze.gastat_population"] = len(b)
+    k = b["Region"].str.strip().str.lower().str.replace("region", "").str.replace("province", "")
+    k = k.str.replace(" ", "").str.replace("-", "").str.replace("\xa0", "")
+    b["region_code"] = k.map(REGION_ALIAS)
+    b["year"] = pd.to_numeric(b["Year"].str.strip().str.translate(str.maketrans("\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669", "0123456789")), errors="coerce")
+    b["n"] = pd.to_numeric(b["Population"].str.replace(",", ""), errors="coerce")
+    assert b[["region_code", "year", "n"]].notna().all().all()
+    b["saudi"] = b["Nationality"].str.strip() == "Saudi"
+    p = b.groupby(["region_code", "year"]).agg(population=("n", "sum")).reset_index()
+    p["year"] = p["year"].astype(int)
+    counts["silver.population_region_year"] = len(p)
+    return p
+
+
 # ----------------------------------------------------------------------------- DMV
 def silver_dmv(counts: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
     d = read_tsv("dmv_disengagements.tsv")
@@ -377,6 +397,7 @@ def main() -> None:
     h, d = prep_hours(wx)
     acc = silver_accidents(counts)
     roads = silver_roads(counts)
+    pop = silver_population(counts)
     dis, miles = silver_dmv(counts)
     crash = silver_nhtsa(counts)
     rr = relative_risks(h, d, crash, dis, miles)
@@ -411,6 +432,14 @@ def main() -> None:
     g = g.merge(acc.rename(columns={"year": "year"}), on=["region_code", "year"], how="left")
     g = g.merge(roads[["region_code", "year", "road_km_per_1000_people", "density_km_per_km2", "intercity_total_km",
                        "intercity_divided_share"]], on=["region_code", "year"], how="left")
+    # population of the same year (2021, 2022) else the latest census count (2022)
+    last = pop[pop["year"] == pop["year"].max()].set_index("region_code")["population"]
+    same = pop.set_index(["region_code", "year"])["population"]
+    g["population"] = [same.get((r, y), last.get(r)) for r, y in zip(g["region_code"], g["year"])]
+    g["population_basis"] = np.where(g["year"] <= pop["year"].max(), "census_year", "census_2022")
+    for c, src in [("acc_serious_per_100k", "serious"), ("acc_deaths_per_100k", "deaths"),
+                   ("acc_injuries_per_100k", "injuries")]:
+        g[c] = 100000.0 * g[src] / g["population"]
     hrs = g["hours"].replace(0, np.nan); dys = g["days"].replace(0, np.nan)
     g["obscured_days"] = g["dust_type_days"] + g["fog_haze_days"]
     for c in ["dust", "haze", "fog", "lowvis", "obsc", "fogh", "rain", "normal", "night"]:
@@ -436,6 +465,7 @@ def main() -> None:
         "roads - Saudi GASTAT (region-year values)": int(roads[["density_km_per_person", "density_km_per_km2",
                                                                  "intercity_highway_km", "intercity_dual_km",
                                                                  "intercity_exit_km", "intercity_single_km"]].notna().sum().sum()),
+        "population - Saudi census (region-year values)": int(len(pop)),
         "AV - DMV disengagements": int(len(dis)),
         "AV - DMV mileage (vehicle-months)": int(len(miles)),
         "AV - NHTSA crashes (in scope)": int(crash["in_scope"].sum()),

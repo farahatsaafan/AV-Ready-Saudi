@@ -15,7 +15,9 @@
 
 How ready is each Saudi region, month by month, for autonomous vehicles, judged by the environmental conditions
 AVs would meet there? No AVs operate in Saudi Arabia yet, so AV behaviour is learned from US records and transferred
-through the conditions both places share (rain, dust/haze/fog/low visibility, day/night).
+through the conditions both places share (rain, fog/haze/low visibility, day/night; dust is measured in Saudi Arabia
+but has no AV evidence, so it stays neutral). Accidents are compared as rates per 100,000 people next to each region's
+road network.
 
 ## 2. Data (all real)
 
@@ -25,8 +27,11 @@ through the conditions both places share (rain, dust/haze/fog/low visibility, da
 | Accidents | GASTAT transport statistics 2022–2025 (serious accidents, deaths, injuries by region) | region × year | Saudi |
 | AV failures | California DMV disengagement + mileage reports 2021–2024 | event / vehicle-month | US |
 | AV crashes | NHTSA Standing General Order ADS reports 2021–2025 | crash | US |
+| Roads | GASTAT road network tables 2022–2025 (density, intercity lengths by type) | region × year | Saudi |
+| Population | GASTAT Saudi Census 2022 — population 2010–2022 by region | region × year | Saudi |
 
-Details and links: [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) · register: [docs/data_source_register.csv](docs/data_source_register.csv).
+Details and **every link used in the project** (source page + download link per file, and the sources that were
+dropped): [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) · register: [docs/data_source_register.csv](docs/data_source_register.csv).
 Raw files are not in Git (`Data/` is ignored). **Download:** [Google Drive — New Data](https://drive.google.com/drive/folders/1hmh-0XqcQ9MZ5juEkdRgR7CMA9GsERj3)
 → `AV-Ready-Saudi_Data_raw.zip`, unzip it in the project folder (it creates `Data/raw/`).
 
@@ -34,19 +39,20 @@ Raw files are not in Git (`Data/` is ignored). **Download:** [Google Drive — N
 
 ```
 Data/raw ──python/00_land_raw.py──► Data/landing/*.tsv   (format only, values verbatim)
-        ──BULK INSERT──► bronze.*   5 raw tables, text + provenance + batch id
+        ──BULK INSERT──► bronze.*   6 raw tables, text + provenance + batch id
         ──silver.load_silver──► silver.*   typed, cleaned, deduplicated, reject_log, reference tables
         ──gold.load_gold──► prep.* (work tables) ──► gold.av_readiness_region_month   (ONE table)
 ```
 
 | Layer | Objects |
 |---|---|
-| Bronze | `noaa_hourly`, `gastat_cells`, `dmv_disengagements`, `dmv_mileage`, `nhtsa_sgo_ads` |
-| Silver | `weather_obs`, `accidents_region_year`, `dmv_disengagement`, `dmv_mileage_monthly`, `nhtsa_crash`, `reject_log`; reference: `dim_region`, `dim_station`, `region_alias`, `gastat_sheet_map` |
+| Bronze | `noaa_hourly`, `gastat_cells`, `dmv_disengagements`, `dmv_mileage`, `nhtsa_sgo_ads`, `gastat_population` |
+| Silver | `weather_obs`, `accidents_region_year`, `roads_region_year`, `population_region_year`, `dmv_disengagement`, `dmv_mileage_monthly`, `nhtsa_crash`, `reject_log`; reference: `dim_region`, `dim_station`, `region_alias`, `gastat_sheet_map` |
 | prep | `weather_station_hour`, `weather_station_day`, `saudi_region_month`, `av_relative_risk` |
 | Gold | `av_readiness_region_month` — 13 regions × 60 months = 780 rows |
 
-Relations: weather ↔ accidents on `region_code + year`; weather ↔ AV events through one condition vocabulary;
+Relations: weather, roads and population ↔ accidents on `region_code + year`; weather ↔ AV events through one
+condition vocabulary (normal / rain / fog_haze / dust, day / night);
 AV events ↔ US weather on state / date. Every source reaches Gold (checked by `sql/quality/03_gold_checks.sql`).
 
 ## 4. Run it (macOS, SQL Server 2022 in Docker)

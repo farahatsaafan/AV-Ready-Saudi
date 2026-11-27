@@ -6,12 +6,13 @@ size and SHA-256, is listed in [`docs/data_files_manifest.csv`](data_files_manif
 ## Download
 
 **Google Drive — [New Data](https://drive.google.com/drive/folders/1hmh-0XqcQ9MZ5juEkdRgR7CMA9GsERj3):**
-`AV-Ready-Saudi_Data_raw.zip` (36 MB, 114 files). Unzip it **in the project folder**; it already contains the
+`AV-Ready-Saudi_Data_raw.zip` (36 MB, 115 files). Unzip it **in the project folder**; it already contains the
 `Data/raw/...` paths below, so nothing has to be moved:
 
 ```
 AV-Ready-Saudi/Data/raw/noaa_global_hourly/2021 ... 2025/   (17 station CSVs + MANIFEST per year)
 AV-Ready-Saudi/Data/raw/gastat/                              (4 xlsx)
+AV-Ready-Saudi/Data/raw/gastat_population/                   (1 csv: Saudi Census 2022 population table)
 AV-Ready-Saudi/Data/raw/ca_dmv_disengagements/               (8 csv)
 AV-Ready-Saudi/Data/raw/ca_dmv_mileage/                      (8 csv)
 AV-Ready-Saudi/Data/raw/nhtsa_sgo/                           (2 csv + 2 pdf)
@@ -30,6 +31,7 @@ Full list with sizes and complete SHA-256: [`docs/data_files_manifest.csv`](data
 |---|---|---|---|
 | NOAA NCEI Global Hourly (Integrated Surface Database) — 13 Saudi + 4 US stations, 2021–2025 | `noaa_global_hourly/<year>/` | 85 | [NCEI ISD](https://www.ncei.noaa.gov/products/land-based-station/integrated-surface-database) · [AWS Open Data mirror used for the download](https://registry.opendata.aws/noaa-isd/) |
 | GASTAT — Land Transport Statistics 2022, 2023; Road Transport Statistics 2024, 2025 (table workbooks) | `gastat/` | 4 | [GASTAT Road Transport Statistics publications](https://www.stats.gov.sa/en/statistics-tabs?tab=436312&category=124894) |
+| GASTAT — Saudi Census 2022: population 2010–2022 by region, nationality and gender | `gastat_population/` | 1 | [GASTAT Census 2022 — Population 2010–2022](https://www.stats.gov.sa/en/w/%D8%A7%D9%84%D8%B3%D9%83%D8%A7%D9%86-2010%D9%85-2022%D9%85-1?tab=436332&category=417653) |
 | California DMV — AV Disengagement Reports 2021–2024 (incl. driverless, first-time filers) | `ca_dmv_disengagements/` | 8 | [DMV Disengagement Reports](https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/disengagement-reports/) · [archived copy](https://web.archive.org/web/20251030174435/https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/disengagement-reports/) |
 | California DMV — AV Mileage Reports 2021–2024 | `ca_dmv_mileage/` | 8 | same page as above |
 | NHTSA Standing General Order — ADS incident reports (archive 2021–2025 + current) and data-element definitions | `nhtsa_sgo/` | 2 CSV + 2 PDF | [NHTSA SGO Crash Reporting](https://www.nhtsa.gov/laws-regulations/standing-general-order-crash-reporting) |
@@ -38,6 +40,9 @@ Notes on the links
 - **GASTAT (stats.gov.sa)** may not open from outside Saudi Arabia; the files were downloaded from a Saudi connection.
   The publications page now shows a newer revision of the 2024 workbook; the file used is the earlier revision,
   still served at the link below.
+- **GASTAT census population**: the page shows an interactive table (Tableau); its "Full Data" button downloads the
+  CSV served at the direct link below (same file, byte for byte). The older census portal (portal.saudicensus.sa)
+  no longer opens, from Egypt or from Saudi Arabia (checked 2026-11-27).
 - **California DMV** removed its Disengagement Reports page in 2026 when its AV regulations changed; the file links
   still work, and the page is kept by the Internet Archive (link above, snapshot of 30 Oct 2025).
 - **NOAA**: files were downloaded from NOAA's mirror on AWS Open Data (`noaa-global-hourly-pds`), which carries the
@@ -57,6 +62,12 @@ Notes on the links
 | `GASTAT_Land_Transport_Statistics_2023_tables.xlsx` | [download](https://www.stats.gov.sa/documents/20117/2435259/Land_Transport_Statistics_table_2023-EN.xlsx_fixed_2468469/46152dd1-80d8-25f0-029f-5dac99160917?t=1734115901531) | `bf9a605644bb` |
 | `GASTAT_Road_Transport_Statistics_2024_tables.xlsx` | [download](https://www.stats.gov.sa/documents/d/guest/rroad-transport-statistics-2024_en) | `64ce979745d4` |
 | `GASTAT_Road_Transport_Statistics_2025_tables.xlsx` | [download](https://www.stats.gov.sa/documents/20117/2435281/%E2%80%8F%E2%80%8F%E2%80%8F%E2%80%8FRoad+Transport+Statistics+2025+-+EN+%281%29.xlsx/ac687a27-82d7-793a-d497-c2fcbb0cbb73?t=1793612751029) | `d8a570f8d9d3` |
+
+### GASTAT Saudi Census 2022 population (`gastat_population/`)
+
+| File | Download | SHA-256 (first 12) |
+|---|---|---|
+| `GASTAT_Census2022_Population_2010_2022_by_Region_Nationality_Gender.csv` | [download](https://tableau.stats.gov.sa/views/TA9-Population2010-2022byRegionNationalityandGender_17298162510520/Population2010-2022byRegionNationalityandGenderCSV.csv) | `9de90ab01988` |
 
 ### California DMV disengagements (`ca_dmv_disengagements/`)
 
@@ -116,6 +127,46 @@ One file per station per year; each cell downloads that file from the AWS mirror
 | `72278023183__US_AZ_Phoenix_PHX` | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2021/72278023183.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2022/72278023183.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2023/72278023183.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2024/72278023183.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2025/72278023183.csv) |
 | `72295023174__US_CA_LosAngeles_LAX` | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2021/72295023174.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2022/72295023174.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2023/72295023174.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2024/72295023174.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2025/72295023174.csv) |
 | `72494023234__US_CA_SanFrancisco_SFO` | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2021/72494023234.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2022/72494023234.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2023/72494023234.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2024/72494023234.csv) | [csv](https://noaa-global-hourly-pds.s3.amazonaws.com/2025/72494023234.csv) |
+
+
+## All links used in the project
+
+Every web address the project has used, from the first design to now. Each source has its **source page** (where the
+data is published) and its **download link** (the file itself).
+
+### A. Sources in use (in the data bundle)
+
+| Source | Source page | Download link(s) |
+|---|---|---|
+| NOAA NCEI Global Hourly (ISD) | [NCEI ISD](https://www.ncei.noaa.gov/products/land-based-station/integrated-surface-database) · [AWS Open Data registry](https://registry.opendata.aws/noaa-isd/) | `https://noaa-global-hourly-pds.s3.amazonaws.com/<year>/<station id>.csv` (used) · official copy `https://www.ncei.noaa.gov/data/global-hourly/access/<year>/<station id>.csv` — every file is listed above |
+| GASTAT Road / Land Transport Statistics 2022–2025 | [GASTAT Road Transport Statistics publications](https://www.stats.gov.sa/en/statistics-tabs?tab=436312&category=124894) | one link per workbook in the GASTAT table above |
+| GASTAT Saudi Census 2022 population | [Population 2010–2022](https://www.stats.gov.sa/en/w/%D8%A7%D9%84%D8%B3%D9%83%D8%A7%D9%86-2010%D9%85-2022%D9%85-1?tab=436332&category=417653) | [CSV](https://tableau.stats.gov.sa/views/TA9-Population2010-2022byRegionNationalityandGender_17298162510520/Population2010-2022byRegionNationalityandGenderCSV.csv) |
+| California DMV AV disengagement + mileage reports | [DMV Disengagement Reports](https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/disengagement-reports/) (removed in 2026) · [archived copy](https://web.archive.org/web/20251030174435/https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/disengagement-reports/) · [DMV Autonomous Vehicles](https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/) | `https://www.dmv.ca.gov/portal/file/<report name>/` — every file is listed above |
+| NHTSA Standing General Order — ADS incident reports | [NHTSA SGO Crash Reporting](https://www.nhtsa.gov/laws-regulations/standing-general-order-crash-reporting) | [current CSV](https://static.nhtsa.gov/odi/ffdd/sgo-2021-01/SGO-2021-01_Incident_Reports_ADS.csv) · [archive 2021–2025 CSV](https://static.nhtsa.gov/odi/ffdd/sgo-2021-01/Archive-2021-2025/SGO-2021-01_Incident_Reports_ADS.csv) · [definitions (current)](https://static.nhtsa.gov/odi/ffdd/sgo-2021-01/SGO-2021-01_Data_Element_Definitions.pdf) · [definitions (archive)](https://static.nhtsa.gov/odi/ffdd/sgo-2021-01/Archive-2021-2025/SGO-2021-01_Data_Element_Definitions.pdf) |
+| Project data bundle | [Google Drive — New Data](https://drive.google.com/drive/folders/1hmh-0XqcQ9MZ5juEkdRgR7CMA9GsERj3) | `AV-Ready-Saudi_Data_raw.zip` |
+
+### B. Sources considered and dropped (not in the bundle, not loaded)
+
+| Source | Source page | Download link | Why it was dropped |
+|---|---|---|---|
+| KAPSARC — Saudi traffic accidents and casualties by region | [dataset (by region)](https://data.kapsarc.org/explore/dataset/saudi-traffic-accidents-and-casualties-by-region/) · [dataset (injured / dead, since 2008)](https://data.kapsarc.org/explore/dataset/saudi-arabia-traffic-accidents-and-casualties-injured-dead-2008/) | [CSV export](https://datasource.kapsarc.org/api/explore/v2.1/catalog/datasets/saudi-arabia-traffic-accidents-and-casualties-injured-dead-2008/exports/csv) | 2016–2019 only, outside 2021–2025; counts all accidents, so not comparable with GASTAT's serious accidents |
+| UK DfT road safety data (STATS19) | [data.gov.uk dataset](https://www.data.gov.uk/dataset/cb7ae6f0-4be6-4935-9277-47e5ce24a11f/road-accidents-safety-data) · [GOV.UK road safety statistics](https://www.gov.uk/government/collections/road-safety-statistics) | e.g. [collisions 2023 CSV](https://data.dft.gov.uk/road-accidents-safety-data/dft-road-casualty-statistics-collision-2023.csv) | accidents must be Saudi only; UK is not where the AV data comes from |
+| Open-Meteo historical weather (ERA5-based) | [Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api) | `https://archive-api.open-meteo.com/v1/archive?...` | computed by a weather model, not measured by a station |
+| Open-Meteo air quality (CAMS dust) | [Air Quality API](https://open-meteo.com/en/docs/air-quality-api) | `https://air-quality-api.open-meteo.com/v1/air-quality?...&hourly=dust` | computed by an atmosphere model (CAMS), not measured; starts August 2022 |
+| Copernicus ERA5 reanalysis | [ERA5 single levels](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels) | (account required) | model output; replaced by NOAA station observations |
+| OpenStreetMap GCC extract (Geofabrik) | [Geofabrik — GCC States](https://download.geofabrik.de/asia/gcc-states.html) | [gcc-states-latest.osm.pbf](https://download.geofabrik.de/asia/gcc-states/gcc-states-latest.osm.pbf) | road geometry not needed by the region × month design; GASTAT road tables used instead |
+| Saudi Open Data portal (MOI traffic, Red Crescent, MOH, NTSC) | [open.data.gov.sa](https://open.data.gov.sa/) | per dataset on the portal | MOI tables are 1437–1439 H (2016–2018); the rest are national totals or very small; GASTAT already covers 2021–2025 |
+| National Center for Meteorology | [ncm.gov.sa](https://ncm.gov.sa/) | — | the portal files are bulletin counts, not weather measurements |
+| California DMV AV collision reports | [DMV collision reports](https://www.dmv.ca.gov/portal/vehicle-industry-services/autonomous-vehicles/autonomous-vehicle-collision-reports/) · [Berkeley TIMS AV safety viewer](https://tims.berkeley.edu/tools/avsafety.php) | — | PDF forms without structured weather; NHTSA SGO used instead |
+| Saudi census portal | [portal.saudicensus.sa](https://portal.saudicensus.sa/portal) | — | no longer opens; the same census table is taken from the GASTAT site (section A) |
+| Microsoft predictive-maintenance sample (old design) | [microsoft/sqlworkshops](https://github.com/microsoft/sqlworkshops/blob/master/SQLServerAndAzureMachineLearning/ML%20Services%20for%20SQL%20Server/data/PdM_telemetry.csv) | [PdM_telemetry.csv](https://raw.githubusercontent.com/microsoft/sqlworkshops/master/SQLServerAndAzureMachineLearning/ML%20Services%20for%20SQL%20Server/data/PdM_telemetry.csv) | not AV data; used only to calibrate the generated telemetry of the old design, which was removed |
+
+### C. Tools and infrastructure
+
+| What | Link |
+|---|---|
+| Repository | [github.com/farahatsaafan/AV-Ready-Saudi](https://github.com/farahatsaafan/AV-Ready-Saudi) |
+| SQL Server 2022 container image (macOS / Linux) | `mcr.microsoft.com/mssql/server:2022-latest` · [Microsoft Learn — run SQL Server Linux containers](https://learn.microsoft.com/en-us/sql/linux/quickstart-install-connect-docker) |
 
 ## Stations
 

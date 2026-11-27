@@ -14,6 +14,7 @@
 --   silver.weather_obs            one row per weather report (typed + condition flags)
 --   silver.accidents_region_year  GASTAT serious accidents / deaths / injuries
 --   silver.roads_region_year      GASTAT road network: density per person / per km2, intercity lengths
+--   silver.population_region_year GASTAT Census 2022: population per region and year 2010-2022
 --   silver.dmv_disengagement      one row per disengagement (date, location, cause)
 --   silver.dmv_mileage_monthly    autonomous miles per vehicle per month
 --   silver.nhtsa_crash            one row per ADS crash (latest report version)
@@ -31,6 +32,7 @@ DROP TABLE IF EXISTS silver.reject_log;
 DROP TABLE IF EXISTS silver.weather_obs;
 DROP TABLE IF EXISTS silver.accidents_region_year;
 DROP TABLE IF EXISTS silver.roads_region_year;
+DROP TABLE IF EXISTS silver.population_region_year;
 DROP TABLE IF EXISTS silver.dmv_disengagement;
 DROP TABLE IF EXISTS silver.dmv_mileage_monthly;
 DROP TABLE IF EXISTS silver.nhtsa_crash;
@@ -69,7 +71,10 @@ CREATE TABLE silver.region_alias (
 INSERT INTO silver.region_alias VALUES
  (N'riyadh','RIY'), (N'makkah','MAK'), (N'madinah','MED'), (N'eastern','EAS'),
  (N'qassim','QAS'), (N'hail','HAI'), (N'tabuk','TAB'), (N'northernborders','NBR'),
- (N'aljouf','JOF'), (N'aseer','ASR'), (N'albaha','BAH'), (N'najran','NAJ'), (N'jazan','JAZ');
+ (N'aljouf','JOF'), (N'aseer','ASR'), (N'albaha','BAH'), (N'najran','NAJ'), (N'jazan','JAZ'),
+ -- spellings used by the Saudi Census 2022 tables
+ (N'arriyadh','RIY'), (N'makkahalmukarramah','MAK'), (N'almadinahalmunawwarah','MED'),
+ (N'alqaseem','QAS'), (N'aljawf','JOF'), (N'albahah','BAH');
 
 -- One station per Saudi region (the region's main airport) + US analog stations
 -- where the NHTSA crashes and DMV tests happen (CA, AZ, TX).
@@ -135,6 +140,12 @@ INSERT INTO silver.gastat_sheet_map VALUES
  (N'Road_Transport_Statistics_2025', N'5-6-1', 'serious_within',  2025, 2, 7, 19),
  (N'Road_Transport_Statistics_2025', N'5-6-1', 'serious_outside', 2025, 3, 7, 19);
 -- 2025 total serious = within + outside (the workbook's total column is a formula).
+
+-- GASTAT's own rate of serious accidents per 100,000 population (2024, 2025), used only as a
+-- cross-check of the rate computed from the census population (sql/quality/02_silver_reconciliation.sql).
+INSERT INTO silver.gastat_sheet_map VALUES
+ (N'Road_Transport_Statistics_2024', N'5-4', 'official_serious_per_100k', 2024, 2, 7, 19),
+ (N'Road_Transport_Statistics_2025', N'5-7', 'official_serious_per_100k', 2025, 2, 7, 19);
 
 -- Road network by region (same workbooks). 2021 has no road tables: the 2022 publication covers 2022 only.
 -- The intercity "Total" column is a formula, so the total is the sum of the four road types.
@@ -255,6 +266,17 @@ CREATE TABLE silver.roads_region_year (
     intercity_divided_share  DECIMAL(6,4)  NULL,   -- (highway + dual carriageway) / total
     source_files             NVARCHAR(400) NULL,
     dw_create_date           DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    PRIMARY KEY (region_code, data_year)
+);
+
+CREATE TABLE silver.population_region_year (
+    region_code          CHAR(3)  NOT NULL REFERENCES silver.dim_region(region_code),
+    data_year            SMALLINT NOT NULL,   -- converted from Arabic-Indic digits
+    population           INT      NOT NULL,   -- all nationalities, both genders
+    population_saudi     INT      NOT NULL,
+    population_non_saudi INT      NOT NULL,
+    source_file          NVARCHAR(400) NOT NULL,
+    dw_create_date       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     PRIMARY KEY (region_code, data_year)
 );
 
@@ -543,6 +565,53 @@ BEGIN
         COMMIT;
         UPDATE audit.load_log SET end_time = SYSDATETIME(), rows_loaded = @rows, status = 'SUCCESS' WHERE load_id = @log;
         PRINT CONCAT('  silver.roads_region_year: ', @rows);
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK;
+        UPDATE audit.load_log SET end_time = SYSDATETIME(), status = 'FAILED', message = LEFT(ERROR_MESSAGE(),2000) WHERE load_id = @log;
+        THROW;
+    END CATCH;
+
+    ---------------------------------------------------------------- population_region_year
+    SET @t0 = SYSDATETIME();
+    INSERT audit.load_log (batch_id, layer, source_name, target_table, start_time, status)
+    VALUES (@batch, 'silver', 'bronze.gastat_population', 'silver.population_region_year', @t0, 'RUNNING');
+    SET @log = SCOPE_IDENTITY();
+    BEGIN TRY
+        BEGIN TRAN;
+        TRUNCATE TABLE silver.population_region_year;
+        DELETE FROM silver.reject_log WHERE source_table = 'population_region_year';
+
+        -- the census table writes years in Arabic-Indic digits: translate them to 0-9
+        SELECT p.source_file, p.source_row_num, p.[Region] AS region_label, p.[Year] AS year_raw,
+               p.[Nationality] AS nationality, p.[Population] AS pop_raw, a.region_code,
+               TRY_CAST(TRANSLATE(LTRIM(RTRIM(p.[Year])), NCHAR(1632)+NCHAR(1633)+NCHAR(1634)+NCHAR(1635)+NCHAR(1636)+NCHAR(1637)+NCHAR(1638)+NCHAR(1639)+NCHAR(1640)+NCHAR(1641), N'0123456789') AS SMALLINT) AS data_year,
+               TRY_CAST(REPLACE(REPLACE(p.[Population], ',', ''), ' ', '') AS INT) AS n
+        INTO #pop
+        FROM bronze.gastat_population p
+        LEFT JOIN silver.region_alias a ON a.alias_key = silver.fn_region_key(p.[Region]);
+
+        INSERT silver.reject_log (source_table, source_file, source_row, reason, raw_value)
+        SELECT 'population_region_year', source_file, source_row_num,
+               CASE WHEN region_code IS NULL THEN 'unknown region label'
+                    WHEN data_year IS NULL THEN 'unparsable year'
+                    ELSE 'population is not a whole number' END,
+               LEFT(CONCAT(region_label, ' | ', year_raw, ' | ', pop_raw), 400)
+        FROM #pop WHERE region_code IS NULL OR data_year IS NULL OR n IS NULL;
+
+        INSERT silver.population_region_year (region_code, data_year, population, population_saudi,
+               population_non_saudi, source_file)
+        SELECT region_code, data_year, SUM(n),
+               SUM(CASE WHEN LTRIM(RTRIM(nationality)) = 'Saudi' THEN n ELSE 0 END),
+               SUM(CASE WHEN LTRIM(RTRIM(nationality)) <> 'Saudi' THEN n ELSE 0 END),
+               MAX(source_file)
+        FROM #pop WHERE region_code IS NOT NULL AND data_year IS NOT NULL AND n IS NOT NULL
+        GROUP BY region_code, data_year;
+        SET @rows = @@ROWCOUNT;
+        DROP TABLE #pop;
+        COMMIT;
+        UPDATE audit.load_log SET end_time = SYSDATETIME(), rows_loaded = @rows, status = 'SUCCESS' WHERE load_id = @log;
+        PRINT CONCAT('  silver.population_region_year: ', @rows);
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;

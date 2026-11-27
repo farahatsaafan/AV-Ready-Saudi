@@ -1,0 +1,41 @@
+table,column,description
+bronze.gastat_population,source_file,raw file the row came from (path under Data/raw)
+bronze.gastat_population,source_row_num,line number in the raw file
+bronze.gastat_population,Gender,Male / Female (as published)
+bronze.gastat_population,Nationality,Saudi / Non Saudi (as published)
+bronze.gastat_population,Region,administrative region name as published by the census table (e.g. Ar Riyadh)
+bronze.gastat_population,Population,population count as published (text)
+bronze.gastat_population,load_batch_id,Bronze batch that loaded the row
+bronze.gastat_population,ingested_at,load time
+silver.roads_region_year,region_code,Saudi administrative region (silver.dim_region)
+silver.roads_region_year,data_year,year of the GASTAT road table (2022-2025)
+silver.roads_region_year,intercity_highway_km,intercity road length classified as highway (fast road)
+silver.roads_region_year,intercity_dual_km,intercity road length classified as dual carriageway (double)
+silver.roads_region_year,intercity_exit_km,intercity road length classified as exit or roundabout
+silver.roads_region_year,intercity_single_km,intercity road length classified as single carriageway
+silver.roads_region_year,source_files,GASTAT workbook(s) the values were read from
+silver.roads_region_year,dw_create_date,Silver load time
+silver.population_region_year,region_code,Saudi administrative region (silver.dim_region)
+silver.population_region_year,population_saudi,Saudi nationals (both genders)
+silver.population_region_year,population_non_saudi,non-Saudi residents (both genders)
+silver.population_region_year,source_file,census CSV the values were read from
+silver.population_region_year,dw_create_date,Silver load time
+prep.weather_station_day,fog_haze_hours,hours that were obscured without any dust report (fog / haze / mist / low visibility)
+prep.saudi_region_month,fog_haze_hours,obscured hours without dust in the month
+prep.saudi_region_month,dust_type_days,days whose day type is dust
+prep.saudi_region_month,fog_haze_days,days whose day type is fog_haze
+gold.av_readiness_region_month,acc_deaths_per_100k,acc_year_deaths / population * 100000
+gold.av_readiness_region_month,acc_injuries_per_100k,acc_year_injuries / population * 100000
+gold.av_readiness_region_month,intercity_road_km,total intercity road length of the region in the year (km; NULL for 2021)
+gold.av_readiness_region_month,av_rr_crash_fog_haze,"relative risk of an NHTSA ADS crash in fog / haze hours vs normal hours (NULL if < 30 crashes, evidence rule)"
+gold.av_readiness_region_month,av_rr_diseng_fog_haze_day,relative risk of a DMV disengagement per fleet mile on California fog / haze days vs normal days
+silver.nhtsa_crash,weather_bucket,dust (Dust Storm) / fog_haze (Fog/Smoke/Haze) / rain (Rain or Snow) / normal / unknown
+prep.weather_station_hour,hour_bucket,dust > fog_haze > rain > normal
+prep.weather_station_day,obscured_hours,hours with dust OR haze OR fog OR visibility < 5 km
+prep.weather_station_day,day_type,">= 3 obscured hours: dust or fog_haze (whichever has more hours, ties -> dust); else rain (>= 1 rain hour); else normal"
+prep.saudi_region_month,obscured_hours,hours with dust OR haze OR fog OR visibility < 5 km
+prep.saudi_region_month,obscured_days,dust_type_days + fog_haze_days
+prep.av_relative_risk,level,"weather: normal, rain, fog_haze, dust / light: day, night"
+gold.av_readiness_region_month,share_obscured_hours,share of hours with dust OR haze OR fog OR visibility < 5 km (= dust + fog/haze)
+gold.av_readiness_region_month,share_fog_haze_hours,share of hours obscured without any dust report (fog / haze / mist / low visibility)
+gold.av_readiness_region_month,obscured_days,dust_type_days + fog_haze_days

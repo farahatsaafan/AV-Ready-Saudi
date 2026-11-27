@@ -8,6 +8,7 @@
 -- How the three data families meet (relations, see docs/05_relations_and_lineage.md):
 --   Weather  -> Accidents : same region_code + same year      (both Saudi, observed)
 --   Roads    -> Accidents : same region_code + same year      (both GASTAT; road network context)
+--   Census   -> Accidents : same region_code + same year      (population -> rates per 100,000)
 --   Weather  -> AV events : same condition vocabulary
 --                           (normal / rain / fog_haze = fog, haze, mist, visibility < 5 km without
 --                            dust / dust = dust or sand reported; day / night by sun position).
@@ -135,7 +136,12 @@ CREATE TABLE gold.av_readiness_region_month (
     acc_year_serious_within_cities INT           NULL,
     acc_year_serious_outside_cities INT          NULL,
     acc_share_outside_cities       DECIMAL(6,4)  NULL,
-    acc_serious_month_avg          DECIMAL(9,2)  NULL,   -- annual / 12 (even split, not observed monthly)
+    -- annual counts are NOT additive over the 12 months of a year: aggregate them with MAX / one row per year
+    population                     INT           NULL,   -- GASTAT Census 2022 table (2021, 2022 observed)
+    population_basis               VARCHAR(20)   NULL,   -- 'census_year' (2021-2022) / 'census_2022' (2023-2025)
+    acc_serious_per_100k           DECIMAL(9,2)  NULL,   -- acc_year_serious / population * 100,000
+    acc_deaths_per_100k            DECIMAL(9,2)  NULL,
+    acc_injuries_per_100k          DECIMAL(9,2)  NULL,
     -- Saudi road network (GASTAT, per region and year; NULL for 2021: no road tables published for it)
     road_km_per_1000_people        DECIMAL(9,3)  NULL,   -- whole network / population
     road_km_per_km2                DECIMAL(9,4)  NULL,   -- whole network / area
@@ -360,7 +366,8 @@ BEGIN
             share_fog_haze_hours, share_rain_hours, share_normal_hours, share_night_hours,
             days_observed, dust_days, dust_type_days, fog_haze_days, obscured_days, rain_days, normal_days,
             acc_year_serious, acc_year_deaths, acc_year_injuries, acc_year_serious_within_cities,
-            acc_year_serious_outside_cities, acc_share_outside_cities, acc_serious_month_avg,
+            acc_year_serious_outside_cities, acc_share_outside_cities,
+            population, population_basis, acc_serious_per_100k, acc_deaths_per_100k, acc_injuries_per_100k,
             road_km_per_1000_people, road_km_per_km2, intercity_road_km, intercity_divided_share,
             av_rr_crash_rain, av_rr_crash_fog_haze, av_rr_crash_dust, av_rr_crash_night,
             av_rr_diseng_rain_day, av_rr_diseng_fog_haze_day, av_rr_diseng_dust_day,
@@ -381,7 +388,10 @@ BEGIN
                w.rain_days, w.normal_days,
                a.serious_accidents, a.deaths, a.injuries, a.serious_within_cities, a.serious_outside_cities,
                CAST(a.serious_outside_cities * 1.0 / NULLIF(a.serious_within_cities + a.serious_outside_cities, 0) AS DECIMAL(6,4)),
-               CAST(a.serious_accidents / 12.0 AS DECIMAL(9,2)),
+               pop.population, pop.basis,
+               CAST(100000.0 * a.serious_accidents / NULLIF(pop.population, 0) AS DECIMAL(9,2)),
+               CAST(100000.0 * a.deaths            / NULLIF(pop.population, 0) AS DECIMAL(9,2)),
+               CAST(100000.0 * a.injuries          / NULLIF(pop.population, 0) AS DECIMAL(9,2)),
                rd.road_km_per_1000_people, rd.road_km_per_km2, rd.intercity_total_km, rd.intercity_divided_share,
                @rr_c_rain, @rr_c_fh, @rr_c_dust, @rr_c_ngt, @rr_d_rain, @rr_d_fh, @rr_d_dust,
                -- weather part only: the night ratio is kept as a column but not multiplied in,
@@ -401,7 +411,14 @@ BEGIN
         FROM cal c
         LEFT JOIN w ON w.region_code = c.region_code AND w.month_start = c.month_start
         LEFT JOIN silver.accidents_region_year a ON a.region_code = c.region_code AND a.data_year = c.y
-        LEFT JOIN silver.roads_region_year rd   ON rd.region_code = c.region_code AND rd.data_year = c.y;
+        LEFT JOIN silver.roads_region_year rd   ON rd.region_code = c.region_code AND rd.data_year = c.y
+        -- population of the same year when the census table has it (2021, 2022); otherwise the latest
+        -- census count (2022), flagged in population_basis - no projection or interpolation
+        OUTER APPLY (SELECT TOP (1) pr.population,
+                            CASE WHEN pr.data_year = c.y THEN 'census_year' ELSE 'census_2022' END AS basis
+                     FROM silver.population_region_year pr
+                     WHERE pr.region_code = c.region_code AND pr.data_year <= c.y
+                     ORDER BY pr.data_year DESC) pop;
         SET @rows = @@ROWCOUNT;
 
         COMMIT;

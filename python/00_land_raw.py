@@ -9,6 +9,8 @@ sources are not shaped that way:
   * GASTAT tables are Excel workbooks (BULK INSERT cannot read .xlsx)
   * CA DMV mileage files name their month columns differently every year
   * the two NHTSA SGO files have different column sets (137 vs 116 columns)
+  * the GASTAT census population table is a long CSV (one row per region x year x
+    nationality x gender); it is landed column for column, Arabic-Indic year digits kept
 
 This script ONLY changes the container format. Every value is copied verbatim
 as text: no trimming, no type conversion, no row or column is dropped.
@@ -46,6 +48,7 @@ NOAA_CORE = ["STATION", "DATE", "SOURCE", "LATITUDE", "LONGITUDE", "ELEVATION", 
 DMV_DIS_COLS = ["manufacturer", "permit_number", "date_raw", "vin", "capable_without_driver",
                 "driver_present", "initiated_by", "location", "description"]
 MILEAGE_CORE = ["manufacturer", "permit_number", "vin", "annual_disengagements"]
+POP_COLS = ["Gender", "Nationality", "Region", "Year", "Population"]
 NHTSA_CORE = ["Report ID", "Report Version", "Reporting Entity", "Make", "Model", "Model Year",
               "State", "City", "Incident Date", "Incident Time (24:00)", "Roadway Type",
               "Posted Speed Limit (MPH)", "Lighting"]
@@ -172,10 +175,24 @@ def land_nhtsa() -> int:
     return w.close()
 
 
+def land_population() -> int:
+    w = Writer("gastat_population.tsv", ["source_file", "source_row_num"] + POP_COLS)
+    for f in sorted((RAW / "gastat_population").glob("*.csv")):
+        rows = read_csv(f)
+        header = rows[0]
+        assert header == POP_COLS, (f.name, header)
+        for i, r in enumerate(rows[1:], start=2):
+            if not any(c.strip() for c in r):
+                continue
+            w.row([rel(f), i] + (r + [""] * len(POP_COLS))[:len(POP_COLS)])
+    return w.close()
+
+
 def main() -> None:
     steps = [("noaa_hourly.tsv", land_noaa), ("gastat_cells.tsv", land_gastat),
              ("dmv_disengagements.tsv", land_dmv_disengagements),
-             ("dmv_mileage.tsv", land_dmv_mileage), ("nhtsa_sgo_ads.tsv", land_nhtsa)]
+             ("dmv_mileage.tsv", land_dmv_mileage), ("nhtsa_sgo_ads.tsv", land_nhtsa),
+             ("gastat_population.tsv", land_population)]
     manifest = []
     for name, fn in steps:
         n = fn()

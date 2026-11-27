@@ -120,6 +120,40 @@ INSERT @r SELECT 'roads: 13 regions x 4 years (2022-2025)', '52', CAST(COUNT(*) 
 FROM silver.roads_region_year;
 INSERT @r SELECT 'roads: rejected GASTAT cells', '0', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 0, 1, 0)
 FROM silver.reject_log WHERE source_table = 'roads_region_year';
+-- population (GASTAT Census 2022 table): 13 regions x 13 years, national 2022 total = official census count
+INSERT @r SELECT 'population: 13 regions x 13 years (2010-2022)', '169', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 169, 1, 0)
+FROM silver.population_region_year;
+INSERT @r SELECT 'population: rejected census rows', '0', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 0, 1, 0)
+FROM silver.reject_log WHERE source_table = 'population_region_year';
+INSERT @r SELECT 'population: Saudi Arabia 2022 = census count', '32175224', CAST(SUM(population) AS NVARCHAR),
+       IIF(SUM(population) = 32175224, 1, 0)
+FROM silver.population_region_year WHERE data_year = 2022;
+-- our serious-accident rate per 100,000 (census 2022 population) against GASTAT's own published rate
+-- (mid-year population estimates). Ours is higher by roughly the population growth since 2022, so the
+-- check passes when every region is within 25 % of the official rate.
+;WITH official AS (
+    SELECT m.data_year, a.region_code,
+           TRY_CAST(REPLACE(v.cell_value, ',', '') AS FLOAT) AS official_rate
+    FROM silver.gastat_sheet_map m
+    JOIN bronze.gastat_cells v   ON v.source_file LIKE '%' + m.file_key + '%' AND v.sheet_name = m.sheet_name
+                                AND TRY_CAST(v.col_num AS INT) = m.col_num
+                                AND TRY_CAST(v.row_num AS INT) BETWEEN m.first_row AND m.last_row
+    JOIN bronze.gastat_cells lbl ON lbl.source_file = v.source_file AND lbl.sheet_name = v.sheet_name
+                                AND lbl.row_num = v.row_num AND TRY_CAST(lbl.col_num AS INT) = 1
+    JOIN silver.region_alias a   ON a.alias_key = silver.fn_region_key(lbl.cell_value)
+    WHERE m.metric = 'official_serious_per_100k'
+), ours AS (
+    SELECT a.data_year, a.region_code, 100000.0 * a.serious_accidents / p.population AS our_rate
+    FROM silver.accidents_region_year a
+    JOIN silver.population_region_year p ON p.region_code = a.region_code AND p.data_year = 2022
+)
+INSERT @r SELECT CONCAT('population: serious per 100k vs GASTAT official ', o.data_year),
+       '13 regions within 25 %',
+       CONCAT(SUM(IIF(ABS(u.our_rate / o.official_rate - 1) <= 0.25, 1, 0)), ' regions; max diff ',
+              CAST(MAX(ABS(u.our_rate / o.official_rate - 1)) * 100 AS DECIMAL(5,1)), ' %'),
+       IIF(SUM(IIF(ABS(u.our_rate / o.official_rate - 1) <= 0.25, 1, 0)) = 13, 1, 0)
+FROM official o JOIN ours u ON u.region_code = o.region_code AND u.data_year = o.data_year
+GROUP BY o.data_year;
 -- national totals must equal GASTAT's published totals
 INSERT @r SELECT CONCAT('accidents: national serious accidents ', data_year),
        CASE data_year WHEN 2023 THEN '16534' WHEN 2024 THEN '17231' WHEN 2025 THEN '17805' END,

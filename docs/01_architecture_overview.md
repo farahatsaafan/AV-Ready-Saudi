@@ -8,16 +8,18 @@ One-page summary of the warehouse. The full design (relations, rules, lineage, d
 
 How ready is each Saudi region, month by month, for autonomous vehicles, judged by the environmental conditions
 AVs would meet there? No AVs operate in Saudi Arabia yet, so AV behaviour is learned from US records (California
-DMV, NHTSA) and transferred through the conditions both places share: rain, obscured (dust / haze / fog /
-visibility < 5 km), normal, and day / night. All data is real (0 % generated).
+DMV, NHTSA) and transferred through the conditions both places share: rain, fog / haze (fog, haze, mist,
+visibility < 5 km), normal, and day / night; dust is measured in Saudi Arabia but has no AV evidence, so it stays
+neutral. Accidents are compared as rates per 100,000 people (Saudi census) alongside each region's road network.
+All data is real (0 % generated).
 
 ## 2. Layers
 
 ```mermaid
 flowchart LR
-  RAW["Data/raw<br/>NOAA · GASTAT · DMV · NHTSA"] -->|python/00_land_raw.py<br/>format only| LAND["Data/landing/*.tsv"]
-  LAND -->|bronze.load_bronze<br/>BULK INSERT| BR["Bronze<br/>5 raw tables, all text"]
-  BR -->|silver.load_silver<br/>type · clean · dedupe · reject| SI["Silver<br/>5 clean tables + reject_log<br/>+ 4 reference tables"]
+  RAW["Data/raw<br/>NOAA · GASTAT · census · DMV · NHTSA"] -->|python/00_land_raw.py<br/>format only| LAND["Data/landing/*.tsv"]
+  LAND -->|bronze.load_bronze<br/>BULK INSERT| BR["Bronze<br/>6 raw tables, all text"]
+  BR -->|silver.load_silver<br/>type · clean · dedupe · reject| SI["Silver<br/>7 clean tables + reject_log<br/>+ 4 reference tables"]
   SI -->|gold.load_gold<br/>aggregate · relate| PR["prep<br/>4 work tables"]
   PR --> GO["Gold<br/>gold.av_readiness_region_month<br/>13 regions × 60 months"]
   GO --> ML["EDA + ML<br/>readiness score per region / season"]
@@ -25,8 +27,8 @@ flowchart LR
 
 | Layer | Schema | Objects | Rule |
 |---|---|---|---|
-| Bronze | `bronze` | `noaa_hourly`, `gastat_cells`, `dmv_disengagements`, `dmv_mileage`, `nhtsa_sgo_ads` | values verbatim as text, plus source file, row number and batch id |
-| Silver | `silver` | `weather_obs`, `accidents_region_year`, `dmv_disengagement`, `dmv_mileage_monthly`, `nhtsa_crash`, `reject_log`; reference `dim_region`, `dim_station`, `region_alias`, `gastat_sheet_map` | typed, cleaned, deduplicated; every dropped row is rejected with a reason or removed by a documented rule |
+| Bronze | `bronze` | `noaa_hourly`, `gastat_cells`, `dmv_disengagements`, `dmv_mileage`, `nhtsa_sgo_ads`, `gastat_population` | values verbatim as text, plus source file, row number and batch id |
+| Silver | `silver` | `weather_obs`, `accidents_region_year`, `roads_region_year`, `population_region_year`, `dmv_disengagement`, `dmv_mileage_monthly`, `nhtsa_crash`, `reject_log`; reference `dim_region`, `dim_station`, `region_alias`, `gastat_sheet_map` | typed, cleaned, deduplicated; every dropped row is rejected with a reason or removed by a documented rule |
 | prep | `prep` | `weather_station_hour`, `weather_station_day`, `saudi_region_month`, `av_relative_risk` | intermediate aggregation, used only to build Gold |
 | Gold | `gold` | `av_readiness_region_month` (the only table) | grain region × month, 2021–2025 |
 | Audit | `audit` | `load_log`, `dq_result` | one row per load step / per quality check |
@@ -34,7 +36,8 @@ flowchart LR
 ## 3. Relations
 
 * Weather ↔ accidents: same `region_code` and year (both Saudi, observed).
-* Weather ↔ AV events: one condition vocabulary (normal / rain / obscured, day / night).
+* Roads ↔ accidents and population ↔ accidents: same `region_code` and year (population turns counts into rates).
+* Weather ↔ AV events: one condition vocabulary (normal / rain / fog_haze / dust, day / night).
 * AV events ↔ US weather: same state and date, giving the exposure for the relative risks; the risks are applied
   to each Saudi region-month's own condition mix.
 

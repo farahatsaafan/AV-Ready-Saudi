@@ -12,6 +12,8 @@
 --   3. bronze.dmv_disengagements California DMV AV disengagement reports 2021-2024
 --   4. bronze.dmv_mileage        California DMV AV mileage reports 2021-2024
 --   5. bronze.nhtsa_sgo_ads      NHTSA Standing General Order ADS crash reports
+--   6. bronze.gastat_population  GASTAT Saudi Census 2022 - population 2010-2022 by region,
+--                                nationality and gender (one row per CSV row)
 --
 -- Input: Data/landing/*.tsv (UTF-16LE, tab, CRLF) produced by python/00_land_raw.py. UTF-16 is used
 -- because CODEPAGE = '65001' is not supported by SQL Server on Linux. (container format
@@ -182,6 +184,30 @@ FROM bronze.nhtsa_sgo_ads;
 GO
 
 -- ------------------------------------------------------------------------------
+-- 6. GASTAT Saudi Census 2022 - population by region, nationality, gender, year
+-- ------------------------------------------------------------------------------
+DROP VIEW  IF EXISTS bronze.v_gastat_population_load;
+DROP TABLE IF EXISTS bronze.gastat_population;
+GO
+CREATE TABLE bronze.gastat_population (
+    source_file     NVARCHAR(400) NULL,
+    source_row_num  NVARCHAR(20)  NULL,
+    [Gender]        NVARCHAR(50)  NULL,
+    [Nationality]   NVARCHAR(50)  NULL,
+    [Region]        NVARCHAR(100) NULL,
+    [Year]          NVARCHAR(20)  NULL,   -- as published, in Arabic-Indic digits (U+0660..U+0669)
+    [Population]    NVARCHAR(50)  NULL,
+    row_end         NVARCHAR(10)  NULL,   -- line-end marker from landing (always ".")
+    load_batch_id   UNIQUEIDENTIFIER NULL,
+    ingested_at     DATETIME2     NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+CREATE VIEW bronze.v_gastat_population_load AS
+SELECT source_file, source_row_num, [Gender], [Nationality], [Region], [Year], [Population], row_end
+FROM bronze.gastat_population;
+GO
+
+-- ------------------------------------------------------------------------------
 -- Load procedure
 -- Usage: EXEC bronze.load_bronze @landing_path = N'/tmp/av/landing';
 -- ------------------------------------------------------------------------------
@@ -201,7 +227,8 @@ BEGIN
       (N'GASTAT workbooks',       N'gastat_cells.tsv',       N'bronze.v_gastat_cells_load',       N'bronze.gastat_cells'),
       (N'CA DMV disengagements',  N'dmv_disengagements.tsv', N'bronze.v_dmv_disengagements_load', N'bronze.dmv_disengagements'),
       (N'CA DMV mileage',         N'dmv_mileage.tsv',        N'bronze.v_dmv_mileage_load',        N'bronze.dmv_mileage'),
-      (N'NHTSA SGO ADS',          N'nhtsa_sgo_ads.tsv',      N'bronze.v_nhtsa_sgo_ads_load',      N'bronze.nhtsa_sgo_ads');
+      (N'NHTSA SGO ADS',          N'nhtsa_sgo_ads.tsv',      N'bronze.v_nhtsa_sgo_ads_load',      N'bronze.nhtsa_sgo_ads'),
+      (N'GASTAT census population', N'gastat_population.tsv', N'bronze.v_gastat_population_load', N'bronze.gastat_population');
     SELECT @n = COUNT(*) FROM @plan;
 
     PRINT 'Bronze batch ' + CAST(@batch AS NVARCHAR(40));
