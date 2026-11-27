@@ -7,6 +7,7 @@
 --
 -- How the three data families meet (relations, see docs/05_relations_and_lineage.md):
 --   Weather  -> Accidents : same region_code + same year      (both Saudi, observed)
+--   Roads    -> Accidents : same region_code + same year      (both GASTAT; road network context)
 --   Weather  -> AV events : same condition vocabulary
 --                           (normal / rain / fog_haze = fog, haze, mist, visibility < 5 km without
 --                            dust / dust = dust or sand reported; day / night by sun position).
@@ -135,6 +136,11 @@ CREATE TABLE gold.av_readiness_region_month (
     acc_year_serious_outside_cities INT          NULL,
     acc_share_outside_cities       DECIMAL(6,4)  NULL,
     acc_serious_month_avg          DECIMAL(9,2)  NULL,   -- annual / 12 (even split, not observed monthly)
+    -- Saudi road network (GASTAT, per region and year; NULL for 2021: no road tables published for it)
+    road_km_per_1000_people        DECIMAL(9,3)  NULL,   -- whole network / population
+    road_km_per_km2                DECIMAL(9,4)  NULL,   -- whole network / area
+    intercity_road_km              DECIMAL(10,1) NULL,
+    intercity_divided_share        DECIMAL(6,4)  NULL,   -- (highway + dual carriageway) / intercity total
     -- AV side (NHTSA crashes + CA DMV disengagements & mileage + US analog weather)
     av_rr_crash_rain               DECIMAL(9,4)  NULL,
     av_rr_crash_fog_haze           DECIMAL(9,4)  NULL,
@@ -355,6 +361,7 @@ BEGIN
             days_observed, dust_days, dust_type_days, fog_haze_days, obscured_days, rain_days, normal_days,
             acc_year_serious, acc_year_deaths, acc_year_injuries, acc_year_serious_within_cities,
             acc_year_serious_outside_cities, acc_share_outside_cities, acc_serious_month_avg,
+            road_km_per_1000_people, road_km_per_km2, intercity_road_km, intercity_divided_share,
             av_rr_crash_rain, av_rr_crash_fog_haze, av_rr_crash_dust, av_rr_crash_night,
             av_rr_diseng_rain_day, av_rr_diseng_fog_haze_day, av_rr_diseng_dust_day,
             av_crash_risk_index, av_diseng_risk_index,
@@ -375,6 +382,7 @@ BEGIN
                a.serious_accidents, a.deaths, a.injuries, a.serious_within_cities, a.serious_outside_cities,
                CAST(a.serious_outside_cities * 1.0 / NULLIF(a.serious_within_cities + a.serious_outside_cities, 0) AS DECIMAL(6,4)),
                CAST(a.serious_accidents / 12.0 AS DECIMAL(9,2)),
+               rd.road_km_per_1000_people, rd.road_km_per_km2, rd.intercity_total_km, rd.intercity_divided_share,
                @rr_c_rain, @rr_c_fh, @rr_c_dust, @rr_c_ngt, @rr_d_rain, @rr_d_fh, @rr_d_dust,
                -- weather part only: the night ratio is kept as a column but not multiplied in,
                -- because its exposure (hours of darkness) is not AV miles driven at night
@@ -392,7 +400,8 @@ BEGIN
                @batch
         FROM cal c
         LEFT JOIN w ON w.region_code = c.region_code AND w.month_start = c.month_start
-        LEFT JOIN silver.accidents_region_year a ON a.region_code = c.region_code AND a.data_year = c.y;
+        LEFT JOIN silver.accidents_region_year a ON a.region_code = c.region_code AND a.data_year = c.y
+        LEFT JOIN silver.roads_region_year rd   ON rd.region_code = c.region_code AND rd.data_year = c.y;
         SET @rows = @@ROWCOUNT;
 
         COMMIT;

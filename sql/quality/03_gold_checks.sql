@@ -28,6 +28,9 @@ FROM prep.av_relative_risk WHERE exposure_share IS NOT NULL;
 INSERT @r SELECT 'GASTAT -> gold accident columns', '780 rows',
        CONCAT(COUNT(*), ' rows'), IIF(COUNT(*) = 780, 1, 0)
 FROM gold.av_readiness_region_month WHERE acc_year_serious IS NOT NULL;
+INSERT @r SELECT 'GASTAT roads -> gold road columns (2022-2025)', '624 rows',
+       CONCAT(COUNT(*), ' rows'), IIF(COUNT(*) = 624, 1, 0)
+FROM gold.av_readiness_region_month WHERE road_km_per_km2 IS NOT NULL AND intercity_road_km IS NOT NULL;
 INSERT @r SELECT 'GASTAT: all 4 workbooks used', '4',
        CAST(COUNT(DISTINCT source_file) AS NVARCHAR), IIF(COUNT(DISTINCT source_file) = 4, 1, 0)
 FROM bronze.gastat_cells c
@@ -60,6 +63,12 @@ FROM prep.av_relative_risk ORDER BY event_source, factor, level;
            SUM(IIF(serious_accidents IS NULL, 0, 1) + IIF(deaths IS NULL, 0, 1) + IIF(injuries IS NULL, 0, 1)
              + IIF(serious_within_cities IS NULL, 0, 1) + IIF(serious_outside_cities IS NULL, 0, 1))
     FROM silver.accidents_region_year
+    UNION ALL
+    SELECT 'roads - Saudi GASTAT (region-year values)', 'Saudi',
+           SUM(IIF(road_km_per_1000_people IS NULL, 0, 1) + IIF(road_km_per_km2 IS NULL, 0, 1)
+             + IIF(intercity_highway_km IS NULL, 0, 1) + IIF(intercity_dual_km IS NULL, 0, 1)
+             + IIF(intercity_exit_km IS NULL, 0, 1) + IIF(intercity_single_km IS NULL, 0, 1))
+    FROM silver.roads_region_year
     UNION ALL SELECT 'AV - DMV disengagements', 'foreign', COUNT_BIG(*) FROM silver.dmv_disengagement
     UNION ALL SELECT 'AV - DMV mileage (vehicle-months)', 'foreign', COUNT_BIG(*) FROM silver.dmv_mileage_monthly
     UNION ALL SELECT 'AV - NHTSA crashes (CA/AZ/TX, 2021-2025)', 'foreign', COUNT_BIG(*) FROM silver.nhtsa_crash WHERE in_scope = 1

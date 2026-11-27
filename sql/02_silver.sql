@@ -13,6 +13,7 @@
 -- Cleaned tables
 --   silver.weather_obs            one row per weather report (typed + condition flags)
 --   silver.accidents_region_year  GASTAT serious accidents / deaths / injuries
+--   silver.roads_region_year      GASTAT road network: density per person / per km2, intercity lengths
 --   silver.dmv_disengagement      one row per disengagement (date, location, cause)
 --   silver.dmv_mileage_monthly    autonomous miles per vehicle per month
 --   silver.nhtsa_crash            one row per ADS crash (latest report version)
@@ -29,6 +30,7 @@ GO
 DROP TABLE IF EXISTS silver.reject_log;
 DROP TABLE IF EXISTS silver.weather_obs;
 DROP TABLE IF EXISTS silver.accidents_region_year;
+DROP TABLE IF EXISTS silver.roads_region_year;
 DROP TABLE IF EXISTS silver.dmv_disengagement;
 DROP TABLE IF EXISTS silver.dmv_mileage_monthly;
 DROP TABLE IF EXISTS silver.nhtsa_crash;
@@ -104,7 +106,9 @@ INSERT INTO silver.dim_station VALUES
 CREATE TABLE silver.gastat_sheet_map (
     file_key    NVARCHAR(80) NOT NULL,   -- matched with LIKE '%' + file_key + '%'
     sheet_name  NVARCHAR(20) NOT NULL,
-    metric      VARCHAR(30)  NOT NULL,   -- serious / serious_within / serious_outside / deaths / injuries
+    metric      VARCHAR(30)  NOT NULL,   -- accidents: serious / serious_within / serious_outside / deaths / injuries
+                                         -- roads: density_km_per_person / density_km_per_km2 /
+                                         --        intercity_highway_km / _dual_km / _exit_km / _single_km
     data_year   SMALLINT     NOT NULL,
     col_num     INT          NOT NULL,
     first_row   INT          NOT NULL,
@@ -131,6 +135,19 @@ INSERT INTO silver.gastat_sheet_map VALUES
  (N'Road_Transport_Statistics_2025', N'5-6-1', 'serious_within',  2025, 2, 7, 19),
  (N'Road_Transport_Statistics_2025', N'5-6-1', 'serious_outside', 2025, 3, 7, 19);
 -- 2025 total serious = within + outside (the workbook's total column is a formula).
+
+-- Road network by region (same workbooks). 2021 has no road tables: the 2022 publication covers 2022 only.
+-- The intercity "Total" column is a formula, so the total is the sum of the four road types.
+INSERT INTO silver.gastat_sheet_map
+SELECT f.file_key, x.sheet_name, x.metric, f.data_year, x.col_num, 7, 19
+FROM (VALUES (N'Land_Transport_Statistics_2022', 2022, N'12',  N'7'),
+             (N'Land_Transport_Statistics_2023', 2023, N'20',  N'15'),
+             (N'Road_Transport_Statistics_2024', 2024, N'7-5', N'7-2'),
+             (N'Road_Transport_Statistics_2025', 2025, N'7-2', N'7-1-2')) f(file_key, data_year, density_sheet, length_sheet)
+CROSS APPLY (VALUES (f.density_sheet, 'density_km_per_person', 2), (f.density_sheet, 'density_km_per_km2', 3),
+                    (f.length_sheet,  'intercity_highway_km',  2), (f.length_sheet,  'intercity_dual_km',  3),
+                    (f.length_sheet,  'intercity_exit_km',     4), (f.length_sheet,  'intercity_single_km', 5)
+            ) x(sheet_name, metric, col_num);
 GO
 
 -- ------------------------------------------------------------------------------
@@ -222,6 +239,22 @@ CREATE TABLE silver.accidents_region_year (
     injuries                INT      NULL,
     source_files            NVARCHAR(400) NULL,
     dw_create_date          DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    PRIMARY KEY (region_code, data_year)
+);
+
+CREATE TABLE silver.roads_region_year (
+    region_code              CHAR(3)  NOT NULL REFERENCES silver.dim_region(region_code),
+    data_year                SMALLINT NOT NULL,
+    road_km_per_1000_people  DECIMAL(9,3)  NULL,   -- whole network (within cities, intercity, dirt) / population
+    road_km_per_km2          DECIMAL(9,4)  NULL,   -- whole network / region area
+    intercity_highway_km     DECIMAL(10,1) NULL,
+    intercity_dual_km        DECIMAL(10,1) NULL,
+    intercity_exit_km        DECIMAL(10,1) NULL,
+    intercity_single_km      DECIMAL(10,1) NULL,
+    intercity_total_km       DECIMAL(10,1) NULL,   -- sum of the four types
+    intercity_divided_share  DECIMAL(6,4)  NULL,   -- (highway + dual carriageway) / total
+    source_files             NVARCHAR(400) NULL,
+    dw_create_date           DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     PRIMARY KEY (region_code, data_year)
 );
 
@@ -396,6 +429,7 @@ BEGIN
                           AND v.col = m.col_num AND v.r BETWEEN m.first_row AND m.last_row
             JOIN cells lbl ON lbl.source_file = v.source_file AND lbl.sheet_name = v.sheet_name
                           AND lbl.r = v.r AND lbl.col = 1
+            WHERE m.metric IN ('serious', 'serious_within', 'serious_outside', 'deaths', 'injuries')
         ), mapped AS (
             SELECT vals.*, a.region_code FROM vals
             LEFT JOIN silver.region_alias a ON a.alias_key = silver.fn_region_key(vals.region_label)
@@ -436,6 +470,79 @@ BEGIN
         COMMIT;
         UPDATE audit.load_log SET end_time = SYSDATETIME(), rows_loaded = @rows, status = 'SUCCESS' WHERE load_id = @log;
         PRINT CONCAT('  silver.accidents_region_year: ', @rows);
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK;
+        UPDATE audit.load_log SET end_time = SYSDATETIME(), status = 'FAILED', message = LEFT(ERROR_MESSAGE(),2000) WHERE load_id = @log;
+        THROW;
+    END CATCH;
+
+    ---------------------------------------------------------------- roads_region_year
+    SET @t0 = SYSDATETIME();
+    INSERT audit.load_log (batch_id, layer, source_name, target_table, start_time, status)
+    VALUES (@batch, 'silver', 'bronze.gastat_cells', 'silver.roads_region_year', @t0, 'RUNNING');
+    SET @log = SCOPE_IDENTITY();
+    BEGIN TRY
+        BEGIN TRAN;
+        TRUNCATE TABLE silver.roads_region_year;
+        DELETE FROM silver.reject_log WHERE source_table = 'roads_region_year';
+
+        ;WITH cells AS (
+            SELECT c.source_file, c.sheet_name, TRY_CAST(c.row_num AS INT) AS r,
+                   TRY_CAST(c.col_num AS INT) AS col, c.cell_value
+            FROM bronze.gastat_cells c
+        ), vals AS (
+            SELECT m.metric, m.data_year, v.source_file, v.r, v.cell_value,
+                   lbl.cell_value AS region_label,
+                   TRY_CAST(REPLACE(REPLACE(v.cell_value, ',', ''), ' ', '') AS FLOAT) AS x
+            FROM silver.gastat_sheet_map m
+            JOIN cells v   ON v.source_file LIKE '%' + m.file_key + '%' AND v.sheet_name = m.sheet_name
+                          AND v.col = m.col_num AND v.r BETWEEN m.first_row AND m.last_row
+            JOIN cells lbl ON lbl.source_file = v.source_file AND lbl.sheet_name = v.sheet_name
+                          AND lbl.r = v.r AND lbl.col = 1
+            WHERE m.metric LIKE 'density%' OR m.metric LIKE 'intercity%'
+        )
+        SELECT vals.*, a.region_code INTO #road FROM vals
+        LEFT JOIN silver.region_alias a ON a.alias_key = silver.fn_region_key(vals.region_label);
+
+        INSERT silver.reject_log (source_table, source_file, source_row, reason, raw_value)
+        SELECT 'roads_region_year', source_file, CONCAT(metric, ' ', data_year, ' row ', r),
+               CASE WHEN region_code IS NULL THEN 'unknown region label' ELSE 'value is not a number' END,
+               LEFT(CONCAT(region_label, ' = ', cell_value), 400)
+        FROM #road WHERE region_code IS NULL OR x IS NULL;
+
+        ;WITH ok AS (
+            SELECT DISTINCT region_code, data_year, metric, x, source_file FROM #road
+            WHERE region_code IS NOT NULL AND x IS NOT NULL
+        ), files AS (
+            SELECT region_code, data_year,
+                   STRING_AGG(CAST(REPLACE(source_file, 'gastat/', '') AS NVARCHAR(MAX)), '; ')
+                       WITHIN GROUP (ORDER BY source_file) AS source_files
+            FROM (SELECT DISTINCT region_code, data_year, source_file FROM ok) f
+            GROUP BY region_code, data_year
+        ), piv AS (
+            SELECT region_code, data_year,
+                   MAX(CASE WHEN metric = 'density_km_per_person' THEN x END) AS dpp,
+                   MAX(CASE WHEN metric = 'density_km_per_km2'    THEN x END) AS dpa,
+                   MAX(CASE WHEN metric = 'intercity_highway_km'  THEN x END) AS hw,
+                   MAX(CASE WHEN metric = 'intercity_dual_km'     THEN x END) AS dual,
+                   MAX(CASE WHEN metric = 'intercity_exit_km'     THEN x END) AS ex,
+                   MAX(CASE WHEN metric = 'intercity_single_km'   THEN x END) AS sg
+            FROM ok GROUP BY region_code, data_year
+        )
+        INSERT silver.roads_region_year (region_code, data_year, road_km_per_1000_people, road_km_per_km2,
+               intercity_highway_km, intercity_dual_km, intercity_exit_km, intercity_single_km,
+               intercity_total_km, intercity_divided_share, source_files)
+        SELECT p.region_code, p.data_year, p.dpp * 1000, p.dpa, p.hw, p.dual, p.ex, p.sg,
+               p.hw + p.dual + p.ex + p.sg,
+               (p.hw + p.dual) / NULLIF(p.hw + p.dual + p.ex + p.sg, 0),
+               LEFT(f.source_files, 400)
+        FROM piv p JOIN files f ON f.region_code = p.region_code AND f.data_year = p.data_year;
+        SET @rows = @@ROWCOUNT;
+        DROP TABLE #road;
+        COMMIT;
+        UPDATE audit.load_log SET end_time = SYSDATETIME(), rows_loaded = @rows, status = 'SUCCESS' WHERE load_id = @log;
+        PRINT CONCAT('  silver.roads_region_year: ', @rows);
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;

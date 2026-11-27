@@ -69,6 +69,19 @@ SHEET_MAP = [
     ("Road_Transport_Statistics_2025", "5-6-1", "serious_within", 2025, 2, 7, 19),
     ("Road_Transport_Statistics_2025", "5-6-1", "serious_outside", 2025, 3, 7, 19),
 ]
+# Road network (GASTAT, from the same workbooks): (file key, sheet, metric, year, column, first row, last row).
+# 2021 has no road tables (the 2022 publication covers 2022 only), so roads start in 2022.
+ROAD_MAP = []
+for _y, _key, _dens, _len in [(2022, "Land_Transport_Statistics_2022", "12", "7"),
+                              (2023, "Land_Transport_Statistics_2023", "20", "15"),
+                              (2024, "Road_Transport_Statistics_2024", "7-5", "7-2"),
+                              (2025, "Road_Transport_Statistics_2025", "7-2", "7-1-2")]:
+    ROAD_MAP += [(_key, _dens, "density_km_per_person", _y, 2, 7, 19),
+                 (_key, _dens, "density_km_per_km2", _y, 3, 7, 19),
+                 (_key, _len, "intercity_highway_km", _y, 2, 7, 19),
+                 (_key, _len, "intercity_dual_km", _y, 3, 7, 19),
+                 (_key, _len, "intercity_exit_km", _y, 4, 7, 19),
+                 (_key, _len, "intercity_single_km", _y, 5, 7, 19)]
 BAD_Q = set("2367")
 
 
@@ -193,6 +206,33 @@ def silver_accidents(counts: dict) -> pd.DataFrame:
     p = a.pivot_table(index=["region_code", "year"], columns="metric", values="n", aggfunc="max").reset_index()
     p["serious"] = p["serious"].fillna(p["serious_within"] + p["serious_outside"])
     counts["silver.accidents_region_year"] = len(p)
+    return p
+
+
+def silver_roads(counts: dict) -> pd.DataFrame:
+    """Road network per region and year (decimal values; the workbook total column is a formula, so the
+    intercity total is the sum of the four road types)."""
+    c = read_tsv("gastat_cells.tsv")
+    c["r"] = to_int(c["row_num"]); c["col"] = to_int(c["col_num"])
+    rows = []
+    for key, sheet, metric, year, col, r0, r1 in ROAD_MAP:
+        s = c[c["source_file"].str.contains(key, regex=False) & (c["sheet_name"] == sheet)]
+        v = s[(s["col"] == col) & s["r"].between(r0, r1)]
+        lbl = s[s["col"] == 1].set_index("r")["cell_value"]
+        for _, x in v.iterrows():
+            k = lbl.get(x["r"], "").strip().lower().replace("region", "").replace("province", "")
+            k = k.replace(" ", "").replace("-", "").replace("\xa0", "")
+            n = pd.to_numeric(x["cell_value"].replace(",", "").replace(" ", ""), errors="coerce")
+            rows.append((REGION_ALIAS.get(k), year, metric, n))
+    a = pd.DataFrame(rows, columns=["region_code", "year", "metric", "v"])
+    bad = a[a["region_code"].isna() | a["v"].isna()]
+    assert bad.empty, bad
+    p = a.pivot_table(index=["region_code", "year"], columns="metric", values="v", aggfunc="max").reset_index()
+    p["intercity_total_km"] = p[["intercity_highway_km", "intercity_dual_km", "intercity_exit_km",
+                                 "intercity_single_km"]].sum(axis=1)
+    p["road_km_per_1000_people"] = p["density_km_per_person"] * 1000
+    p["intercity_divided_share"] = (p["intercity_highway_km"] + p["intercity_dual_km"]) / p["intercity_total_km"]
+    counts["silver.roads_region_year"] = len(p)
     return p
 
 
@@ -336,6 +376,7 @@ def main() -> None:
     wx = silver_weather(counts)
     h, d = prep_hours(wx)
     acc = silver_accidents(counts)
+    roads = silver_roads(counts)
     dis, miles = silver_dmv(counts)
     crash = silver_nhtsa(counts)
     rr = relative_risks(h, d, crash, dis, miles)
@@ -368,6 +409,8 @@ def main() -> None:
     g = cal.merge(m, on=["region_code", "month_start"], how="left")
     g["year"] = g["month_start"].dt.year
     g = g.merge(acc.rename(columns={"year": "year"}), on=["region_code", "year"], how="left")
+    g = g.merge(roads[["region_code", "year", "road_km_per_1000_people", "density_km_per_km2", "intercity_total_km",
+                       "intercity_divided_share"]], on=["region_code", "year"], how="left")
     hrs = g["hours"].replace(0, np.nan); dys = g["days"].replace(0, np.nan)
     g["obscured_days"] = g["dust_type_days"] + g["fog_haze_days"]
     for c in ["dust", "haze", "fog", "lowvis", "obsc", "fogh", "rain", "normal", "night"]:
@@ -390,6 +433,9 @@ def main() -> None:
         "weather - US analog stations (hourly reports)": int((wx["country"] == "US").sum()),
         "accidents - Saudi GASTAT (region-year values)": int(acc[["serious", "deaths", "injuries"]].notna().sum().sum()
                                                              + acc[["serious_within", "serious_outside"]].notna().sum().sum()),
+        "roads - Saudi GASTAT (region-year values)": int(roads[["density_km_per_person", "density_km_per_km2",
+                                                                 "intercity_highway_km", "intercity_dual_km",
+                                                                 "intercity_exit_km", "intercity_single_km"]].notna().sum().sum()),
         "AV - DMV disengagements": int(len(dis)),
         "AV - DMV mileage (vehicle-months)": int(len(miles)),
         "AV - NHTSA crashes (in scope)": int(crash["in_scope"].sum()),

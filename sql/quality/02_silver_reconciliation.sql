@@ -115,6 +115,11 @@ INSERT @r VALUES ('crashes: bronze rows accounted for', CAST(@nb AS NVARCHAR),
 INSERT @r SELECT 'accidents: 13 regions x 5 years', '65', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 65, 1, 0) FROM silver.accidents_region_year;
 INSERT @r SELECT 'accidents: rejected GASTAT cells', '0', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 0, 1, 0)
 FROM silver.reject_log WHERE source_table = 'accidents_region_year';
+-- roads: 13 regions x 4 years (2022-2025), no unknown region label or non-numeric cell
+INSERT @r SELECT 'roads: 13 regions x 4 years (2022-2025)', '52', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 52, 1, 0)
+FROM silver.roads_region_year;
+INSERT @r SELECT 'roads: rejected GASTAT cells', '0', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 0, 1, 0)
+FROM silver.reject_log WHERE source_table = 'roads_region_year';
 -- national totals must equal GASTAT's published totals
 INSERT @r SELECT CONCAT('accidents: national serious accidents ', data_year),
        CASE data_year WHEN 2023 THEN '16534' WHEN 2024 THEN '17231' WHEN 2025 THEN '17805' END,
