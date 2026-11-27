@@ -5,20 +5,29 @@
 --           No aggregation to month/region here: that is Gold's job (Lab 3).
 --
 -- Reference tables (seeded here, they are the join keys of the whole model)
---   silver.dim_region        13 Saudi administrative regions
---   silver.region_alias      GASTAT label spellings -> region_code
---   silver.dim_station       17 weather stations -> Saudi region or US state
---   silver.gastat_sheet_map  which GASTAT sheet/column holds which metric/year
+--   silver.dim_region         13 Saudi administrative regions
+--   silver.region_alias       GASTAT label spellings -> region_code
+--   silver.dim_station        17 weather stations -> Saudi region or US state
+--   silver.dim_condition      condition vocabulary v2 (dust / haze_dry / fog_moist / rain / normal,
+--                             NHTSA-only categories, day / night) with the WMO/METAR rule of each
+--   silver.gastat_sheet_map   every GASTAT sheet/column the warehouse reads (one place)
+--   silver.gastat_traffic_map layout of the monthly traffic sheets (two layouts over 2021-2025)
 --
 -- Cleaned tables
---   silver.weather_obs            one row per weather report (typed + condition flags)
+--   silver.weather_obs            one row per weather report (typed + dew point + condition flags)
 --   silver.accidents_region_year  GASTAT serious accidents / deaths / injuries
 --   silver.roads_region_year      GASTAT road network: density per person / per km2, intercity lengths
---   silver.population_region_year GASTAT Census 2022: population per region and year 2010-2022
+--   silver.population_region_year population per region and year: Census 2022 table (2010-2022) and
+--                                 GASTAT's own denominator for 2023-2025 recovered from its published rates
+--   silver.traffic_region_month   GASTAT monthly intercity traffic per region, 2021-2025
+--   silver.region_service_2025    GASTAT 2025: ambulance response time, registered vehicles per region
 --   silver.dmv_disengagement      one row per disengagement (date, location, cause)
 --   silver.dmv_mileage_monthly    autonomous miles per vehicle per month
 --   silver.nhtsa_crash            one row per ADS crash (latest report version)
 --   silver.reject_log             rows that failed a rule, with the reason
+--
+-- Function
+--   silver.fn_day_type            the single day-type rule (Saudi days and California days)
 -- ==============================================================================
 
 USE av_ready_saudi_dw;
@@ -27,18 +36,28 @@ GO
 -- ------------------------------------------------------------------------------
 -- 0. Reference tables
 -- ------------------------------------------------------------------------------
--- drop in dependency order (tables that reference dim_region first) so the script can be re-run
+-- Re-run safety: prep.* and gold.* reference Silver tables by foreign key, so they are dropped first
+-- (sql/03_gold.sql rebuilds them). Then Silver in dependency order (tables that reference a dimension first).
+DROP TABLE IF EXISTS gold.av_readiness_region_month;
+DROP TABLE IF EXISTS prep.av_relative_risk;
+DROP TABLE IF EXISTS prep.saudi_region_month;
+DROP TABLE IF EXISTS prep.weather_station_day;
+DROP TABLE IF EXISTS prep.weather_station_hour;
 DROP TABLE IF EXISTS silver.reject_log;
 DROP TABLE IF EXISTS silver.weather_obs;
 DROP TABLE IF EXISTS silver.accidents_region_year;
 DROP TABLE IF EXISTS silver.roads_region_year;
 DROP TABLE IF EXISTS silver.population_region_year;
+DROP TABLE IF EXISTS silver.traffic_region_month;
+DROP TABLE IF EXISTS silver.region_service_2025;
 DROP TABLE IF EXISTS silver.dmv_disengagement;
 DROP TABLE IF EXISTS silver.dmv_mileage_monthly;
 DROP TABLE IF EXISTS silver.nhtsa_crash;
 DROP TABLE IF EXISTS silver.region_alias;
 DROP TABLE IF EXISTS silver.dim_station;
+DROP TABLE IF EXISTS silver.gastat_traffic_map;
 DROP TABLE IF EXISTS silver.gastat_sheet_map;
+DROP TABLE IF EXISTS silver.dim_condition;
 DROP TABLE IF EXISTS silver.dim_region;
 GO
 CREATE TABLE silver.dim_region (
@@ -74,7 +93,50 @@ INSERT INTO silver.region_alias VALUES
  (N'aljouf','JOF'), (N'aseer','ASR'), (N'albaha','BAH'), (N'najran','NAJ'), (N'jazan','JAZ'),
  -- spellings used by the Saudi Census 2022 tables
  (N'arriyadh','RIY'), (N'makkahalmukarramah','MAK'), (N'almadinahalmunawwarah','MED'),
- (N'alqaseem','QAS'), (N'aljawf','JOF'), (N'albahah','BAH');
+ (N'alqaseem','QAS'), (N'aljawf','JOF'), (N'albahah','BAH'),
+ -- spelling used by the 2021/2022 monthly traffic table (Land_Transport_Statistics_2022, sheet 14)
+ (N'ryiadh','RIY');
+
+-- Condition vocabulary v2: the ONE place where the weather <-> AV relation is defined.
+-- Saudi and US station-hours are classified with the same rules (silver.weather_obs flags ->
+-- prep.weather_station_hour.hour_bucket), NHTSA crash categories map onto it, and every table that
+-- carries a condition references this table by foreign key.
+CREATE TABLE silver.dim_condition (
+    condition_code  VARCHAR(25)   NOT NULL PRIMARY KEY,
+    factor          VARCHAR(10)   NOT NULL,   -- weather / light
+    priority        TINYINT       NULL,       -- hour bucket priority (1 = wins); NULL = not an hour bucket
+    label           NVARCHAR(80)  NOT NULL,
+    rule_text       NVARCHAR(400) NOT NULL,
+    us_av_coverage  VARCHAR(30)   NOT NULL    -- is the condition inside the US AV evidence envelope?
+);
+INSERT INTO silver.dim_condition VALUES
+ ('dust',      'weather', 1, N'Dust / sand',
+  N'Report codes dust or sand: MW (WMO 4677) 06-09 or 30-35; AU1 obscuration 5 (DU widespread dust) or 6 (SA sand); AU1 other 1 (dust/sand whirls), 4 (sandstorm), 5 (duststorm).',
+  'uncovered'),
+ ('haze_dry',  'weather', 2, N'Dry haze / smoke',
+  N'Obscured hour (haze MW 04-05 / AW 04-05 / AU1 3 FU or 7 HZ; fog; or visibility < 5 km) with no dust report and not fog_moist: no fog code and min(temperature - dew point) in the hour > 2.5 degC.',
+  'covered'),
+ ('fog_moist', 'weather', 3, N'Fog / mist (moist obscuration)',
+  N'Obscured hour with no dust report and (a fog code: MW 40-49, AW 30-35, AU1 obscuration 2 FG; or min(temperature - dew point) in the hour <= 2.5 degC).',
+  'covered'),
+ ('rain',      'weather', 4, N'Rain / precipitation',
+  N'Hour not obscured and precipitation reported: MW 50-69 or 80-99; AW 40-69 or 80-89; AU1 precipitation 01 DZ, 02 RA, 09 UP; or measured 1-hour precipitation > 0 mm.',
+  'covered'),
+ ('normal',    'weather', 5, N'Normal',
+  N'None of the above in the hour.',
+  'reference'),
+ ('obscured_unspecified', 'weather', NULL, N'Fog/Smoke/Haze (NHTSA box)',
+  N'NHTSA SGO crash with "Weather - Fog/Smoke/Haze" = Y and no dust storm. Its US exposure is the fog_moist + haze_dry station-hours (NHTSA does not separate them).',
+  'nhtsa_category'),
+ ('unknown',   'weather', NULL, N'Weather unknown (NHTSA)',
+  N'NHTSA SGO crash with no weather box ticked or "Unknown": excluded from the relative risks.',
+  'excluded'),
+ ('day',       'light',   NULL, N'Daylight',
+  N'Sun elevation >= -0.833 deg (NOAA solar position at the station); NHTSA archive rows use the reported Lighting field.',
+  'reference'),
+ ('night',     'light',   NULL, N'Night',
+  N'Sun elevation < -0.833 deg; NHTSA archive rows: Lighting "Dark..." or "Dawn...".',
+  'covered');
 
 -- One station per Saudi region (the region's main airport) + US analog stations
 -- where the NHTSA crashes and DMV tests happen (CA, AZ, TX).
@@ -141,11 +203,55 @@ INSERT INTO silver.gastat_sheet_map VALUES
  (N'Road_Transport_Statistics_2025', N'5-6-1', 'serious_outside', 2025, 3, 7, 19);
 -- 2025 total serious = within + outside (the workbook's total column is a formula).
 
--- GASTAT's own rate of serious accidents per 100,000 population (2024, 2025), used only as a
--- cross-check of the rate computed from the census population (sql/quality/02_silver_reconciliation.sql).
+-- GASTAT's own rates per 100,000 population. GASTAT divides by its own mid-year population, so that
+-- denominator is recovered as count x 100,000 / published rate (arithmetic on official numbers, no model):
+--   2023 from the mortality rate, 2024 and 2025 from the serious-accident rate (silver.population_region_year).
+-- The 2024 / 2025 mortality rates are a cross-check only (sql/quality/02_silver_reconciliation.sql).
+-- Note: the 2025 workbook revises the 2024 rates (e.g. Riyadh mortality 9.99 -> 9.49); each year uses its own publication.
 INSERT INTO silver.gastat_sheet_map VALUES
+ (N'Land_Transport_Statistics_2023', N'35',  'official_deaths_per_100k',  2023, 2, 7, 19),
  (N'Road_Transport_Statistics_2024', N'5-4', 'official_serious_per_100k', 2024, 2, 7, 19),
- (N'Road_Transport_Statistics_2025', N'5-7', 'official_serious_per_100k', 2025, 2, 7, 19);
+ (N'Road_Transport_Statistics_2025', N'5-7', 'official_serious_per_100k', 2025, 2, 7, 19),
+ (N'Road_Transport_Statistics_2024', N'5-2', 'official_deaths_per_100k',  2024, 2, 7, 19),
+ (N'Road_Transport_Statistics_2025', N'5-2', 'official_deaths_per_100k',  2025, 4, 8, 20);
+
+-- Region service attributes published for 2025 only (ambulance response time "MM:SS", registered vehicles).
+INSERT INTO silver.gastat_sheet_map VALUES
+ (N'Road_Transport_Statistics_2025', N'5-11',  'response_within_cities',  2025, 3, 7, 19),
+ (N'Road_Transport_Statistics_2025', N'5-11',  'response_outside_cities', 2025, 4, 7, 19),
+ (N'Road_Transport_Statistics_2025', N'4-1-2', 'registered_vehicles',     2025, 2, 7, 19);
+
+-- Monthly intercity traffic (layout details in silver.gastat_traffic_map; col_num = first value column).
+INSERT INTO silver.gastat_sheet_map VALUES
+ (N'Land_Transport_Statistics_2022', N'14',    'traffic_monthly', 2021, 2, 27, 38),
+ (N'Land_Transport_Statistics_2022', N'14',    'traffic_monthly', 2022, 2,  8, 19),
+ (N'Land_Transport_Statistics_2023', N'29',    'traffic_monthly', 2023, 3,  8, 20),
+ (N'Road_Transport_Statistics_2024', N'3-5',   'traffic_monthly', 2024, 3,  8, 20),
+ (N'Road_Transport_Statistics_2025', N'3-3-1', 'traffic_monthly', 2025, 3,  8, 20);
+
+-- Two layouts of the traffic sheets:
+--   car_truck_pairs (2021, 2022): "Average Daily Traffic ... by Month and Administrative Region"; region names on
+--       header_row in columns 2, 4, ..., 26, each region a (Car, Truck) column pair; months Jan-Dec on first_row..last_row.
+--       Value = Car + Truck = average daily vehicles per count point.
+--   region_rows (2023-2025): "Total traffic ..."; one region per row (label col 1), col 2 = number of count points,
+--       cols 3-14 = Jan-Dec total vehicles. Value = total / count points / days in month.
+-- Levels of the two definitions are not comparable; traffic_month_index (month / mean of the region's 12 months) is.
+CREATE TABLE silver.gastat_traffic_map (
+    data_year   SMALLINT     NOT NULL PRIMARY KEY,
+    file_key    NVARCHAR(80) NOT NULL,
+    sheet_name  NVARCHAR(20) NOT NULL,
+    layout      VARCHAR(20)  NOT NULL,
+    header_row  INT          NOT NULL,
+    first_row   INT          NOT NULL,
+    last_row    INT          NOT NULL,
+    definition  VARCHAR(40)  NOT NULL
+);
+INSERT INTO silver.gastat_traffic_map VALUES
+ (2021, N'Land_Transport_Statistics_2022', N'14',    'car_truck_pairs', 25, 27, 38, 'avg_daily_per_count_point'),
+ (2022, N'Land_Transport_Statistics_2022', N'14',    'car_truck_pairs',  6,  8, 19, 'avg_daily_per_count_point'),
+ (2023, N'Land_Transport_Statistics_2023', N'29',    'region_rows',      7,  8, 20, 'total_div_points_days'),
+ (2024, N'Road_Transport_Statistics_2024', N'3-5',   'region_rows',      7,  8, 20, 'total_div_points_days'),
+ (2025, N'Road_Transport_Statistics_2025', N'3-3-1', 'region_rows',      7,  8, 20, 'total_div_points_days');
 
 -- Road network by region (same workbooks). 2021 has no road tables: the 2022 publication covers 2022 only.
 -- The intercity "Total" column is a formula, so the total is the sum of the four road types.
@@ -172,6 +278,23 @@ BEGIN
     SET @s = REPLACE(REPLACE(@s, N'region', N''), N'province', N'');
     SET @s = REPLACE(REPLACE(REPLACE(@s, N' ', N''), N'-', N''), NCHAR(160), N'');
     RETURN @s;
+END
+GO
+
+-- Day type: the ONE rule for Saudi days (prep.weather_station_day) and California days (DMV evidence).
+-- >= 3 obscured hours (dust + haze_dry + fog_moist) -> the largest of the three (ties: dust > haze_dry > fog_moist);
+-- else rain if >= 1 rain hour; else normal.
+CREATE OR ALTER FUNCTION silver.fn_day_type (@dust INT, @haze_dry INT, @fog_moist INT, @rain INT)
+RETURNS VARCHAR(25) WITH SCHEMABINDING
+AS
+BEGIN
+    DECLARE @d INT = ISNULL(@dust, 0), @h INT = ISNULL(@haze_dry, 0), @f INT = ISNULL(@fog_moist, 0);
+    RETURN CASE WHEN @d + @h + @f >= 3
+                THEN CASE WHEN @d >= @h AND @d >= @f THEN 'dust'
+                          WHEN @h >= @f THEN 'haze_dry'
+                          ELSE 'fog_moist' END
+                WHEN ISNULL(@rain, 0) >= 1 THEN 'rain'
+                ELSE 'normal' END;
 END
 GO
 
@@ -214,12 +337,14 @@ CREATE TABLE silver.reject_log (
 );
 
 CREATE TABLE silver.weather_obs (
-    station_id      CHAR(11)      NOT NULL,
+    station_id      CHAR(11)      NOT NULL REFERENCES silver.dim_station(station_id),
     obs_utc         DATETIME2(0)  NOT NULL,
     obs_local       DATETIME2(0)  NOT NULL,
     report_type     VARCHAR(10)   NOT NULL,
     vis_m           INT           NULL,
     temp_c          DECIMAL(5,1)  NULL,
+    dew_c           DECIMAL(5,1)  NULL,   -- dew point (DEW, parsed exactly like TMP)
+    dew_spread_c    DECIMAL(5,1)  NULL,   -- temp_c - dew_c: small = moist air (fog / mist), large = dry (dust haze)
     wind_ms         DECIMAL(5,1)  NULL,
     precip_1h_mm    DECIMAL(6,1)  NULL,
     mw_code         CHAR(2)       NULL,   -- manual present weather (WMO 4677)
@@ -234,6 +359,8 @@ CREATE TABLE silver.weather_obs (
     is_rain         BIT NOT NULL,
     is_low_vis      BIT NOT NULL,         -- visibility < 5 km
     is_night        BIT NOT NULL,         -- sun below the horizon
+    is_hot40        BIT NOT NULL,         -- temp_c >= 40 degC
+    is_hot45        BIT NOT NULL,         -- temp_c >= 45 degC
     source_file     NVARCHAR(400) NOT NULL,
     source_row_num  INT           NOT NULL,
     dw_create_date  DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
@@ -271,13 +398,43 @@ CREATE TABLE silver.roads_region_year (
 
 CREATE TABLE silver.population_region_year (
     region_code          CHAR(3)  NOT NULL REFERENCES silver.dim_region(region_code),
-    data_year            SMALLINT NOT NULL,   -- converted from Arabic-Indic digits
+    data_year            SMALLINT NOT NULL,   -- census rows: converted from Arabic-Indic digits
     population           INT      NOT NULL,   -- all nationalities, both genders
-    population_saudi     INT      NOT NULL,
-    population_non_saudi INT      NOT NULL,
+    population_saudi     INT      NULL,       -- census rows only
+    population_non_saudi INT      NULL,       -- census rows only
+    population_basis     VARCHAR(30)   NOT NULL,   -- census_2022_table (2010-2022) / gastat_rate_implied (2023-2025)
+    basis_detail         NVARCHAR(200) NOT NULL,   -- how the number was obtained
     source_file          NVARCHAR(400) NOT NULL,
     dw_create_date       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     PRIMARY KEY (region_code, data_year)
+);
+
+-- Monthly intercity traffic per region (GASTAT). adt_per_point is comparable within a definition;
+-- traffic_month_index (month / mean of the region's 12 months of that year) is comparable across all years.
+CREATE TABLE silver.traffic_region_month (
+    region_code          CHAR(3)       NOT NULL REFERENCES silver.dim_region(region_code),
+    month_start          DATE          NOT NULL,
+    data_year            SMALLINT      NOT NULL,
+    month_num            TINYINT       NOT NULL,
+    adt_per_point        DECIMAL(12,1) NOT NULL,   -- average daily vehicles per count point
+    total_vehicles       DECIMAL(14,1) NULL,       -- 2023-2025: month total over the region's count points
+    count_points         INT           NULL,       -- 2023-2025
+    definition           VARCHAR(40)   NOT NULL,   -- avg_daily_per_count_point / total_div_points_days
+    traffic_month_index  DECIMAL(6,3)  NOT NULL,
+    source_file          NVARCHAR(400) NOT NULL,
+    source_sheet         NVARCHAR(20)  NOT NULL,
+    dw_create_date       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    PRIMARY KEY (region_code, month_start)
+);
+
+-- Region service attributes (GASTAT Road Transport Statistics 2025): one row per region.
+CREATE TABLE silver.region_service_2025 (
+    region_code          CHAR(3)  NOT NULL PRIMARY KEY REFERENCES silver.dim_region(region_code),
+    response_within_s    INT      NOT NULL,   -- average ambulance response time within cities (seconds)
+    response_outside_s   INT      NOT NULL,   -- outside cities (seconds)
+    registered_vehicles  BIGINT   NOT NULL,   -- vehicles registered in the region (2025)
+    source_file          NVARCHAR(400) NOT NULL,
+    dw_create_date       DATETIME2 NOT NULL DEFAULT SYSDATETIME()
 );
 
 CREATE TABLE silver.dmv_disengagement (
@@ -322,7 +479,8 @@ CREATE TABLE silver.nhtsa_crash (
     lighting_raw      NVARCHAR(100) NULL,
     w_clear  BIT NOT NULL, w_cloudy BIT NOT NULL, w_rain BIT NOT NULL, w_snow BIT NOT NULL,
     w_fog_smoke_haze BIT NOT NULL, w_dust BIT NOT NULL, w_wind BIT NOT NULL, w_unknown BIT NOT NULL,
-    weather_bucket    VARCHAR(10)   NOT NULL,   -- dust / fog_haze / rain / normal / unknown
+    weather_bucket    VARCHAR(25)   NOT NULL REFERENCES silver.dim_condition(condition_code),
+                                                -- dust / obscured_unspecified / rain / normal / unknown
     is_night          BIT           NULL,
     in_scope          BIT           NOT NULL,   -- state CA/AZ/TX and incident year 2021-2025
     dw_create_date    DATETIME2     NOT NULL DEFAULT SYSDATETIME()
@@ -368,6 +526,9 @@ BEGIN
                    -- TMP: +tttt,q  (tenths of degC; +9999 = missing)
                    CASE WHEN SUBSTRING(b.TMP,7,1) IN ('2','3','6','7') THEN NULL
                         ELSE NULLIF(TRY_CAST(LEFT(b.TMP,5) AS INT), 9999) / 10.0 END AS temp_c,
+                   -- DEW: +tttt,q  exactly like TMP (dew point, tenths of degC; +9999 = missing)
+                   CASE WHEN SUBSTRING(b.DEW,7,1) IN ('2','3','6','7') THEN NULL
+                        ELSE NULLIF(TRY_CAST(LEFT(b.DEW,5) AS INT), 9999) / 10.0 END AS dew_c,
                    -- WND: ddd,q,t,ssss,q  (speed tenths of m/s; 9999 = missing)
                    CASE WHEN SUBSTRING(b.WND,14,1) IN ('2','3','6','7') THEN NULL
                         ELSE NULLIF(TRY_CAST(SUBSTRING(b.WND,9,4) AS INT), 9999) / 10.0 END AS wind_ms,
@@ -388,12 +549,12 @@ BEGIN
             WHERE TRY_CONVERT(DATETIME2(0), b.[DATE], 126) IS NOT NULL
               AND LTRIM(RTRIM(b.REPORT_TYPE)) NOT IN ('SOD', 'SOM')
         )
-        INSERT silver.weather_obs (station_id, obs_utc, obs_local, report_type, vis_m, temp_c, wind_ms,
-               precip_1h_mm, mw_code, aw_code, au_precip, au_obscuration, au_other, sun_elev_deg,
-               is_dust, is_haze, is_fog, is_rain, is_low_vis, is_night, source_file, source_row_num)
+        INSERT silver.weather_obs (station_id, obs_utc, obs_local, report_type, vis_m, temp_c, dew_c, dew_spread_c,
+               wind_ms, precip_1h_mm, mw_code, aw_code, au_precip, au_obscuration, au_other, sun_elev_deg,
+               is_dust, is_haze, is_fog, is_rain, is_low_vis, is_night, is_hot40, is_hot45, source_file, source_row_num)
         SELECT p.station_id, p.obs_utc,
                CAST(CAST(p.obs_utc AS DATETIMEOFFSET) AT TIME ZONE p.tz_name AS DATETIME2(0)),
-               p.report_type, p.vis_m, p.temp_c, p.wind_ms, p.precip_1h_mm,
+               p.report_type, p.vis_m, p.temp_c, p.dew_c, p.temp_c - p.dew_c, p.wind_ms, p.precip_1h_mm,
                p.mw_code, p.aw_code, p.au_precip, p.au_obscuration, p.au_other,
                CAST(se.elevation_deg AS DECIMAL(6,2)),
                -- dust/sand: WMO 4677 06-09, 30-35; METAR obscuration DU/SA; whirls/sand/dust storm
@@ -411,6 +572,8 @@ BEGIN
                       OR p.au_precip IN ('01','02','09') OR p.precip_1h_mm > 0 THEN 1 ELSE 0 END,
                CASE WHEN p.vis_m < 5000 THEN 1 ELSE 0 END,
                CASE WHEN se.elevation_deg < -0.833 THEN 1 ELSE 0 END,
+               CASE WHEN p.temp_c >= 40 THEN 1 ELSE 0 END,
+               CASE WHEN p.temp_c >= 45 THEN 1 ELSE 0 END,
                p.source_file, p.source_row_num
         FROM p
         CROSS APPLY silver.tvf_solar_elevation(p.latitude, p.longitude, p.obs_utc) se
@@ -600,18 +763,196 @@ BEGIN
         FROM #pop WHERE region_code IS NULL OR data_year IS NULL OR n IS NULL;
 
         INSERT silver.population_region_year (region_code, data_year, population, population_saudi,
-               population_non_saudi, source_file)
+               population_non_saudi, population_basis, basis_detail, source_file)
         SELECT region_code, data_year, SUM(n),
                SUM(CASE WHEN LTRIM(RTRIM(nationality)) = 'Saudi' THEN n ELSE 0 END),
                SUM(CASE WHEN LTRIM(RTRIM(nationality)) <> 'Saudi' THEN n ELSE 0 END),
+               'census_2022_table', N'GASTAT Census 2022 table, all nationalities',
                MAX(source_file)
         FROM #pop WHERE region_code IS NOT NULL AND data_year IS NOT NULL AND n IS NOT NULL
         GROUP BY region_code, data_year;
         SET @rows = @@ROWCOUNT;
         DROP TABLE #pop;
+
+        -- 2023-2025: GASTAT's own denominator, recovered from its published rate per 100,000
+        -- (population = count x 100,000 / rate). This step needs silver.accidents_region_year (loaded above).
+        ;WITH rate AS (
+            SELECT m.metric, m.data_year, m.sheet_name, v.source_file, a.region_code, lbl.cell_value AS region_label,
+                   TRY_CAST(REPLACE(v.cell_value, ',', '') AS FLOAT) AS rate
+            FROM silver.gastat_sheet_map m
+            JOIN bronze.gastat_cells v   ON v.source_file LIKE '%' + m.file_key + '%' AND v.sheet_name = m.sheet_name
+                                        AND TRY_CAST(v.col_num AS INT) = m.col_num
+                                        AND TRY_CAST(v.row_num AS INT) BETWEEN m.first_row AND m.last_row
+            JOIN bronze.gastat_cells lbl ON lbl.source_file = v.source_file AND lbl.sheet_name = v.sheet_name
+                                        AND lbl.row_num = v.row_num AND TRY_CAST(lbl.col_num AS INT) = 1
+            LEFT JOIN silver.region_alias a ON a.alias_key = silver.fn_region_key(lbl.cell_value)
+            WHERE m.metric IN ('official_deaths_per_100k', 'official_serious_per_100k')
+        ), basis AS (   -- which published rate gives the denominator of each year
+            SELECT * FROM (VALUES (2023, 'official_deaths_per_100k',  'deaths'),
+                                  (2024, 'official_serious_per_100k', 'serious'),
+                                  (2025, 'official_serious_per_100k', 'serious')) b(data_year, metric, count_col)
+        )
+        SELECT r.*, b.count_col,
+               CASE b.count_col WHEN 'deaths' THEN acc.deaths ELSE acc.serious_accidents END AS n
+        INTO #imp
+        FROM rate r JOIN basis b ON b.data_year = r.data_year AND b.metric = r.metric
+        LEFT JOIN silver.accidents_region_year acc ON acc.region_code = r.region_code AND acc.data_year = r.data_year;
+
+        INSERT silver.reject_log (source_table, source_file, source_row, reason, raw_value)
+        SELECT 'population_region_year', source_file, CONCAT(metric, ' ', data_year),
+               CASE WHEN region_code IS NULL THEN 'unknown region label'
+                    WHEN rate IS NULL OR rate <= 0 THEN 'rate is not a positive number'
+                    ELSE 'no accident count for the region-year' END,
+               LEFT(CONCAT(region_label, ' = ', rate), 400)
+        FROM #imp WHERE region_code IS NULL OR rate IS NULL OR rate <= 0 OR n IS NULL;
+
+        INSERT silver.population_region_year (region_code, data_year, population, population_basis, basis_detail, source_file)
+        SELECT region_code, data_year, CAST(ROUND(n * 100000.0 / rate, 0) AS INT), 'gastat_rate_implied',
+               CONCAT(count_col, N' x 100000 / ', metric, N' (', REPLACE(source_file, N'gastat/', N''), N' sheet ', sheet_name, N')'),
+               source_file
+        FROM #imp WHERE region_code IS NOT NULL AND rate > 0 AND n IS NOT NULL;
+        SET @rows = @rows + @@ROWCOUNT;
+        DROP TABLE #imp;
         COMMIT;
         UPDATE audit.load_log SET end_time = SYSDATETIME(), rows_loaded = @rows, status = 'SUCCESS' WHERE load_id = @log;
         PRINT CONCAT('  silver.population_region_year: ', @rows);
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK;
+        UPDATE audit.load_log SET end_time = SYSDATETIME(), status = 'FAILED', message = LEFT(ERROR_MESSAGE(),2000) WHERE load_id = @log;
+        THROW;
+    END CATCH;
+
+    ---------------------------------------------------------------- traffic_region_month
+    SET @t0 = SYSDATETIME();
+    INSERT audit.load_log (batch_id, layer, source_name, target_table, start_time, status)
+    VALUES (@batch, 'silver', 'bronze.gastat_cells', 'silver.traffic_region_month', @t0, 'RUNNING');
+    SET @log = SCOPE_IDENTITY();
+    BEGIN TRY
+        BEGIN TRAN;
+        TRUNCATE TABLE silver.traffic_region_month;
+        DELETE FROM silver.reject_log WHERE source_table = 'traffic_region_month';
+
+        SELECT c.source_file, c.sheet_name, TRY_CAST(c.row_num AS INT) AS r, TRY_CAST(c.col_num AS INT) AS k,
+               c.cell_value
+        INTO #tc
+        FROM bronze.gastat_cells c
+        WHERE EXISTS (SELECT 1 FROM silver.gastat_traffic_map t
+                      WHERE c.source_file LIKE '%' + t.file_key + '%' AND c.sheet_name = t.sheet_name);
+
+        -- layout car_truck_pairs: region label on header_row (cols 2, 4, ...), Car in that column, Truck in the next
+        ;WITH pairs AS (
+            SELECT t.data_year, t.definition, t.first_row, t.last_row, h.source_file, h.sheet_name, h.k,
+                   h.cell_value AS region_label, a.region_code
+            FROM silver.gastat_traffic_map t
+            JOIN #tc h ON h.source_file LIKE '%' + t.file_key + '%' AND h.sheet_name = t.sheet_name
+                      AND h.r = t.header_row AND h.k >= 2 AND LTRIM(RTRIM(ISNULL(h.cell_value, N''))) <> N''
+            LEFT JOIN silver.region_alias a ON a.alias_key = silver.fn_region_key(h.cell_value)
+            WHERE t.layout = 'car_truck_pairs'
+        )
+        SELECT p.region_code, p.region_label, p.data_year, v.r - p.first_row + 1 AS month_num,
+               TRY_CAST(v.cell_value AS FLOAT) + TRY_CAST(w.cell_value AS FLOAT) AS adt,
+               CAST(NULL AS FLOAT) AS total_vehicles, CAST(NULL AS INT) AS count_points,
+               p.definition, p.source_file, p.sheet_name,
+               CONCAT(v.cell_value, N' + ', w.cell_value) AS raw_value
+        INTO #traffic
+        FROM pairs p
+        JOIN #tc v ON v.source_file = p.source_file AND v.sheet_name = p.sheet_name AND v.k = p.k
+                  AND v.r BETWEEN p.first_row AND p.last_row
+        LEFT JOIN #tc w ON w.source_file = p.source_file AND w.sheet_name = p.sheet_name AND w.k = p.k + 1 AND w.r = v.r;
+
+        -- layout region_rows: one region per row, col 2 = count points, cols 3-14 = Jan-Dec total vehicles
+        ;WITH rr AS (
+            SELECT t.data_year, t.definition, l.source_file, l.sheet_name, l.r, l.cell_value AS region_label,
+                   a.region_code, TRY_CAST(pt.cell_value AS INT) AS count_points
+            FROM silver.gastat_traffic_map t
+            JOIN #tc l ON l.source_file LIKE '%' + t.file_key + '%' AND l.sheet_name = t.sheet_name
+                      AND l.k = 1 AND l.r BETWEEN t.first_row AND t.last_row
+            LEFT JOIN #tc pt ON pt.source_file = l.source_file AND pt.sheet_name = l.sheet_name AND pt.r = l.r AND pt.k = 2
+            LEFT JOIN silver.region_alias a ON a.alias_key = silver.fn_region_key(l.cell_value)
+            WHERE t.layout = 'region_rows'
+        )
+        INSERT #traffic
+        SELECT rr.region_code, rr.region_label, rr.data_year, v.k - 2,
+               TRY_CAST(v.cell_value AS FLOAT) / NULLIF(rr.count_points, 0)
+                   / DAY(EOMONTH(DATEFROMPARTS(rr.data_year, v.k - 2, 1))),
+               TRY_CAST(v.cell_value AS FLOAT), rr.count_points, rr.definition, rr.source_file, rr.sheet_name,
+               CONCAT(v.cell_value, N' / ', rr.count_points)
+        FROM rr JOIN #tc v ON v.source_file = rr.source_file AND v.sheet_name = rr.sheet_name AND v.r = rr.r
+                          AND v.k BETWEEN 3 AND 14;
+
+        INSERT silver.reject_log (source_table, source_file, source_row, reason, raw_value)
+        SELECT 'traffic_region_month', source_file, CONCAT(sheet_name, ' ', data_year, ' month ', month_num),
+               CASE WHEN region_code IS NULL THEN 'unknown region label' ELSE 'traffic value is not a number' END,
+               LEFT(CONCAT(region_label, ' = ', raw_value), 400)
+        FROM #traffic WHERE region_code IS NULL OR adt IS NULL;
+
+        INSERT silver.traffic_region_month (region_code, month_start, data_year, month_num, adt_per_point,
+               total_vehicles, count_points, definition, traffic_month_index, source_file, source_sheet)
+        SELECT region_code, DATEFROMPARTS(data_year, month_num, 1), data_year, month_num, ROUND(adt, 1),
+               total_vehicles, count_points, definition,
+               ROUND(adt / AVG(adt) OVER (PARTITION BY region_code, data_year), 3),
+               source_file, sheet_name
+        FROM #traffic WHERE region_code IS NOT NULL AND adt IS NOT NULL;
+        SET @rows = @@ROWCOUNT;
+        DROP TABLE #traffic; DROP TABLE #tc;
+        COMMIT;
+        UPDATE audit.load_log SET end_time = SYSDATETIME(), rows_loaded = @rows, status = 'SUCCESS' WHERE load_id = @log;
+        PRINT CONCAT('  silver.traffic_region_month: ', @rows);
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK;
+        UPDATE audit.load_log SET end_time = SYSDATETIME(), status = 'FAILED', message = LEFT(ERROR_MESSAGE(),2000) WHERE load_id = @log;
+        THROW;
+    END CATCH;
+
+    ---------------------------------------------------------------- region_service_2025
+    SET @t0 = SYSDATETIME();
+    INSERT audit.load_log (batch_id, layer, source_name, target_table, start_time, status)
+    VALUES (@batch, 'silver', 'bronze.gastat_cells', 'silver.region_service_2025', @t0, 'RUNNING');
+    SET @log = SCOPE_IDENTITY();
+    BEGIN TRY
+        BEGIN TRAN;
+        TRUNCATE TABLE silver.region_service_2025;
+        DELETE FROM silver.reject_log WHERE source_table = 'region_service_2025';
+
+        ;WITH vals AS (
+            SELECT m.metric, v.source_file, lbl.cell_value AS region_label, a.region_code, v.cell_value,
+                   -- response time "MM:SS" -> seconds; vehicle count -> number
+                   CASE WHEN m.metric LIKE 'response%'
+                        THEN TRY_CAST(PARSENAME(REPLACE(LTRIM(RTRIM(v.cell_value)), ':', '.'), 2) AS INT) * 60
+                           + TRY_CAST(PARSENAME(REPLACE(LTRIM(RTRIM(v.cell_value)), ':', '.'), 1) AS INT)
+                        ELSE TRY_CAST(TRY_CAST(REPLACE(v.cell_value, ',', '') AS FLOAT) AS BIGINT) END AS x
+            FROM silver.gastat_sheet_map m
+            JOIN bronze.gastat_cells v   ON v.source_file LIKE '%' + m.file_key + '%' AND v.sheet_name = m.sheet_name
+                                        AND TRY_CAST(v.col_num AS INT) = m.col_num
+                                        AND TRY_CAST(v.row_num AS INT) BETWEEN m.first_row AND m.last_row
+            JOIN bronze.gastat_cells lbl ON lbl.source_file = v.source_file AND lbl.sheet_name = v.sheet_name
+                                        AND lbl.row_num = v.row_num AND TRY_CAST(lbl.col_num AS INT) = 1
+            LEFT JOIN silver.region_alias a ON a.alias_key = silver.fn_region_key(lbl.cell_value)
+            WHERE m.metric IN ('response_within_cities', 'response_outside_cities', 'registered_vehicles')
+        )
+        SELECT * INTO #svc FROM vals;
+
+        INSERT silver.reject_log (source_table, source_file, source_row, reason, raw_value)
+        SELECT 'region_service_2025', source_file, metric,
+               CASE WHEN region_code IS NULL THEN 'unknown region label' ELSE 'value not readable' END,
+               LEFT(CONCAT(region_label, ' = ', cell_value), 400)
+        FROM #svc WHERE region_code IS NULL OR x IS NULL;
+
+        INSERT silver.region_service_2025 (region_code, response_within_s, response_outside_s, registered_vehicles, source_file)
+        SELECT region_code,
+               MAX(CASE WHEN metric = 'response_within_cities'  THEN x END),
+               MAX(CASE WHEN metric = 'response_outside_cities' THEN x END),
+               MAX(CASE WHEN metric = 'registered_vehicles'     THEN x END),
+               MAX(source_file)
+        FROM #svc WHERE region_code IS NOT NULL AND x IS NOT NULL
+        GROUP BY region_code;
+        SET @rows = @@ROWCOUNT;
+        DROP TABLE #svc;
+        COMMIT;
+        UPDATE audit.load_log SET end_time = SYSDATETIME(), rows_loaded = @rows, status = 'SUCCESS' WHERE load_id = @log;
+        PRINT CONCAT('  silver.region_service_2025: ', @rows);
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;
@@ -822,9 +1163,11 @@ BEGIN
                        ORDER BY file_rank, rid) AS rn2
             FROM one WHERE rn_s = 1
         )
+        -- v2: NHTSA has one "Fog/Smoke/Haze" box, so it cannot be split into fog_moist / haze_dry:
+        -- it maps to obscured_unspecified (silver.dim_condition)
         SELECT d.*,
                CASE WHEN d.wd = 'Y' THEN 'dust'
-                    WHEN d.wf = 'Y' THEN 'fog_haze'
+                    WHEN d.wf = 'Y' THEN 'obscured_unspecified'
                     WHEN d.wr = 'Y' OR d.wsn = 'Y' THEN 'rain'
                     WHEN d.wc = 'Y' OR d.wcl = 'Y' OR d.wpc = 'Y' OR d.ww = 'Y' THEN 'normal'
                     ELSE 'unknown' END AS wbucket

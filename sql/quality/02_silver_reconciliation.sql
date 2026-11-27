@@ -120,20 +120,22 @@ INSERT @r SELECT 'roads: 13 regions x 4 years (2022-2025)', '52', CAST(COUNT(*) 
 FROM silver.roads_region_year;
 INSERT @r SELECT 'roads: rejected GASTAT cells', '0', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 0, 1, 0)
 FROM silver.reject_log WHERE source_table = 'roads_region_year';
--- population (GASTAT Census 2022 table): 13 regions x 13 years, national 2022 total = official census count
-INSERT @r SELECT 'population: 13 regions x 13 years (2010-2022)', '169', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 169, 1, 0)
+-- population: Census 2022 table rows (13 regions x 13 years, 2010-2022) + GASTAT's own denominator for
+-- 2023-2025 recovered from its published rates (13 x 3) = 208 rows
+INSERT @r SELECT 'population: 13 regions x 16 years (census 2010-2022 + rate-implied 2023-2025)', '208',
+       CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 208, 1, 0)
 FROM silver.population_region_year;
-INSERT @r SELECT 'population: rejected census rows', '0', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 0, 1, 0)
+INSERT @r SELECT 'population: census_2022_table rows (2010-2022)', '169', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 169, 1, 0)
+FROM silver.population_region_year WHERE population_basis = 'census_2022_table';
+INSERT @r SELECT 'population: rejected census rows / rates', '0', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 0, 1, 0)
 FROM silver.reject_log WHERE source_table = 'population_region_year';
 INSERT @r SELECT 'population: Saudi Arabia 2022 = census count', '32175224', CAST(SUM(population) AS NVARCHAR),
        IIF(SUM(population) = 32175224, 1, 0)
 FROM silver.population_region_year WHERE data_year = 2022;
--- our serious-accident rate per 100,000 (census 2022 population) against GASTAT's own published rate
--- (mid-year population estimates). Ours is higher by roughly the population growth since 2022, so the
--- check passes when every region is within 25 % of the official rate.
+-- the implied 2023-2025 populations must give back GASTAT's published rate (within 0.1 %), and the
+-- mortality rates of 2024 / 2025 (not used to build them) must agree within 1 %
 ;WITH official AS (
-    SELECT m.data_year, a.region_code,
-           TRY_CAST(REPLACE(v.cell_value, ',', '') AS FLOAT) AS official_rate
+    SELECT m.metric, m.data_year, a.region_code, TRY_CAST(REPLACE(v.cell_value, ',', '') AS FLOAT) AS official_rate
     FROM silver.gastat_sheet_map m
     JOIN bronze.gastat_cells v   ON v.source_file LIKE '%' + m.file_key + '%' AND v.sheet_name = m.sheet_name
                                 AND TRY_CAST(v.col_num AS INT) = m.col_num
@@ -141,19 +143,72 @@ FROM silver.population_region_year WHERE data_year = 2022;
     JOIN bronze.gastat_cells lbl ON lbl.source_file = v.source_file AND lbl.sheet_name = v.sheet_name
                                 AND lbl.row_num = v.row_num AND TRY_CAST(lbl.col_num AS INT) = 1
     JOIN silver.region_alias a   ON a.alias_key = silver.fn_region_key(lbl.cell_value)
-    WHERE m.metric = 'official_serious_per_100k'
+    WHERE m.metric IN ('official_serious_per_100k', 'official_deaths_per_100k')
 ), ours AS (
-    SELECT a.data_year, a.region_code, 100000.0 * a.serious_accidents / p.population AS our_rate
-    FROM silver.accidents_region_year a
-    JOIN silver.population_region_year p ON p.region_code = a.region_code AND p.data_year = 2022
+    SELECT o.metric, o.data_year, o.region_code, o.official_rate,
+           100000.0 * CASE WHEN o.metric = 'official_deaths_per_100k' THEN a.deaths ELSE a.serious_accidents END
+                    / p.population AS our_rate,
+           CASE WHEN (o.data_year = 2023 AND o.metric = 'official_deaths_per_100k')
+                  OR (o.data_year IN (2024, 2025) AND o.metric = 'official_serious_per_100k')
+                THEN 'basis' ELSE 'cross-check' END AS role
+    FROM official o
+    JOIN silver.accidents_region_year a ON a.region_code = o.region_code AND a.data_year = o.data_year
+    JOIN silver.population_region_year p ON p.region_code = o.region_code AND p.data_year = o.data_year
 )
-INSERT @r SELECT CONCAT('population: serious per 100k vs GASTAT official ', o.data_year),
-       '13 regions within 25 %',
-       CONCAT(SUM(IIF(ABS(u.our_rate / o.official_rate - 1) <= 0.25, 1, 0)), ' regions; max diff ',
-              CAST(MAX(ABS(u.our_rate / o.official_rate - 1)) * 100 AS DECIMAL(5,1)), ' %'),
-       IIF(SUM(IIF(ABS(u.our_rate / o.official_rate - 1) <= 0.25, 1, 0)) = 13, 1, 0)
-FROM official o JOIN ours u ON u.region_code = o.region_code AND u.data_year = o.data_year
-GROUP BY o.data_year;
+INSERT @r SELECT CONCAT('population ', data_year, ': ', REPLACE(metric, 'official_', 'GASTAT '), ' reproduced (', role, ')'),
+       CONCAT('13 regions within ', IIF(role = 'basis', '0.1', '1'), ' %'),
+       CONCAT(SUM(IIF(ABS(our_rate / official_rate - 1) <= IIF(role = 'basis', 0.001, 0.01), 1, 0)), ' regions; max diff ',
+              CAST(MAX(ABS(our_rate / official_rate - 1)) * 100 AS DECIMAL(6,3)), ' %'),
+       IIF(SUM(IIF(ABS(our_rate / official_rate - 1) <= IIF(role = 'basis', 0.001, 0.01), 1, 0)) = 13, 1, 0)
+FROM ours GROUP BY data_year, metric, role;
+
+-- traffic: 13 regions x 60 months, nothing rejected, and the 2023 regional totals add up to GASTAT's own
+-- national total row (sheet 29 row 21, cols 3-14) within 0.5 %
+INSERT @r SELECT 'traffic: 13 regions x 60 months', '780', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 780, 1, 0)
+FROM silver.traffic_region_month;
+INSERT @r SELECT 'traffic: rejected GASTAT cells', '0', CAST(COUNT(*) AS NVARCHAR), IIF(COUNT(*) = 0, 1, 0)
+FROM silver.reject_log WHERE source_table = 'traffic_region_month';
+;WITH tot AS (
+    SELECT TRY_CAST(v.col_num AS INT) - 2 AS month_num, TRY_CAST(v.cell_value AS FLOAT) AS gastat_total
+    FROM bronze.gastat_cells v
+    WHERE v.source_file LIKE '%Land_Transport_Statistics_2023%' AND v.sheet_name = '29'
+      AND TRY_CAST(v.row_num AS INT) = 21 AND TRY_CAST(v.col_num AS INT) BETWEEN 3 AND 14
+), ours AS (
+    SELECT month_num, SUM(CAST(total_vehicles AS FLOAT)) AS our_total
+    FROM silver.traffic_region_month WHERE data_year = 2023 GROUP BY month_num
+)
+INSERT @r SELECT 'traffic 2023: sum of regions = GASTAT total row (12 months)', '12 months within 0.5 %',
+       CONCAT(SUM(IIF(ABS(o.our_total / t.gastat_total - 1) <= 0.005, 1, 0)), ' months; max diff ',
+              CAST(MAX(ABS(o.our_total / t.gastat_total - 1)) * 100 AS DECIMAL(6,3)), ' %'),
+       IIF(SUM(IIF(ABS(o.our_total / t.gastat_total - 1) <= 0.005, 1, 0)) = 12, 1, 0)
+FROM tot t JOIN ours o ON o.month_num = t.month_num;
+INSERT @r SELECT 'traffic: month index averages 1 per region-year', '65 region-years within 0.001',
+       CONCAT(SUM(IIF(ABS(m - 1) <= 0.001, 1, 0)), ' region-years'), IIF(SUM(IIF(ABS(m - 1) <= 0.001, 1, 0)) = 65, 1, 0)
+FROM (SELECT AVG(CAST(traffic_month_index AS FLOAT)) AS m FROM silver.traffic_region_month GROUP BY region_code, data_year) x;
+
+-- region service (GASTAT 2025): 13 regions, response times and vehicles all read
+INSERT @r SELECT 'region service 2025: 13 regions', '13', CAST(COUNT(*) AS NVARCHAR),
+       IIF(COUNT(*) = 13 AND MIN(response_within_s) > 0 AND MIN(response_outside_s) > 0 AND MIN(registered_vehicles) > 0, 1, 0)
+FROM silver.region_service_2025;
+
+-- weather: dew point parsed (a dew point above the temperature is physically impossible -> must be rare)
+INSERT @r SELECT 'weather: dew point parsed (dew > temp below 0.5 %)', '< 0.5 % of reports with both',
+       CONCAT(CAST(100.0 * SUM(IIF(dew_c > temp_c, 1, 0)) / NULLIF(COUNT(*), 0) AS DECIMAL(6,3)), ' % of ', COUNT(*)),
+       IIF(COUNT(*) > 0 AND 100.0 * SUM(IIF(dew_c > temp_c, 1, 0)) / COUNT(*) < 0.5, 1, 0)
+FROM silver.weather_obs WHERE dew_c IS NOT NULL AND temp_c IS NOT NULL;
+
+-- weather v2: Saudi station-hour shares 2021-2025 (13 stations) = the independent build (+-0.1 pp)
+;WITH sh AS (
+    SELECT h.hour_bucket, 100.0 * COUNT(*) / SUM(COUNT(*)) OVER () AS pct
+    FROM prep.weather_station_hour h JOIN silver.dim_station s ON s.station_id = h.station_id AND s.country = 'SA'
+    GROUP BY h.hour_bucket
+), ex AS (
+    SELECT * FROM (VALUES ('dust', 3.49), ('haze_dry', 1.16), ('fog_moist', 0.51), ('rain', 0.51), ('normal', 94.34)) e(b, pct)
+)
+INSERT @r SELECT CONCAT('weather v2: Saudi share of ', ex.b, ' hours'), CONCAT(ex.pct, ' % +- 0.1'),
+       CONCAT(CAST(ISNULL(sh.pct, 0) AS DECIMAL(6,2)), ' %'), IIF(ABS(ISNULL(sh.pct, 0) - ex.pct) <= 0.1, 1, 0)
+FROM ex LEFT JOIN sh ON sh.hour_bucket = ex.b;
+
 -- national totals must equal GASTAT's published totals
 INSERT @r SELECT CONCAT('accidents: national serious accidents ', data_year),
        CASE data_year WHEN 2023 THEN '16534' WHEN 2024 THEN '17231' WHEN 2025 THEN '17805' END,
