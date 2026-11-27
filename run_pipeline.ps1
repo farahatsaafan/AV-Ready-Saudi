@@ -4,7 +4,10 @@ AV-Ready-Saudi - full pipeline on Windows (local SQL Server instance)
   1. python\00_land_raw.py        Data\raw -> Data\landing\*.tsv (format only)
   2. sql\00..03 + load procedures  Bronze -> Silver -> Gold
   3. sql\quality\*.sql             checks + data shares
-  4. python\02_reference_gold.py   independent pandas rebuild to compare with SQL
+  4. python\02_reference_gold.py   independent pandas rebuild (Silver -> prep -> Gold)
+  5. python\04_av_evidence_models.py  GLM cross-check of the AV relative risks + forest plot
+  6. export Gold -> Data\gold_export\gold_av_readiness_region_month.csv, compare SQL Gold with the reference
+  7. python\05_readiness_model.py  readiness score, clustering, supervised test, sensitivity, figures
 Usage (from the project folder, PowerShell 5.1 or 7):
   powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1
   powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1 -ServerInstance "localhost"
@@ -46,11 +49,11 @@ if (-not (Test-Path $py)) {
     & $sysPy -m venv .venv
     if ($LASTEXITCODE -ne 0) { throw "Failed: python -m venv .venv" }
 }
-& $py -c "import openpyxl, pandas, numpy" 2>$null
+& $py -c "import openpyxl, pandas, numpy, statsmodels, scipy, sklearn, matplotlib" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host ">>> Installing openpyxl, pandas, numpy into .venv" -ForegroundColor Yellow
+    Write-Host ">>> Installing openpyxl, pandas, numpy, statsmodels, scipy, scikit-learn, matplotlib into .venv" -ForegroundColor Yellow
     & $py -m pip install --quiet --upgrade pip
-    & $py -m pip install --quiet openpyxl pandas numpy
+    & $py -m pip install --quiet openpyxl pandas numpy statsmodels scipy scikit-learn matplotlib
     if ($LASTEXITCODE -ne 0) { throw "Failed: pip install" }
 }
 
@@ -82,10 +85,38 @@ Run-Sql "quality\01_bronze_validation.sql"
 Run-Sql "quality\02_silver_reconciliation.sql"
 Run-Sql "quality\03_gold_checks.sql"
 Run-Sql "quality\04_rollback_demo.sql"
+Run-Sql "04_analysis.sql"
 
 Write-Host ">>> 02_reference_gold.py (independent pandas build)" -ForegroundColor Yellow
 & $py (Join-Path $PSScriptRoot "python\02_reference_gold.py") *> (Join-Path $PSScriptRoot "Data\reference_run.log")
 if ($LASTEXITCODE -eq 0) { Write-Host "Reference written to Data\reference\ (log: Data\reference_run.log)" }
 else { Write-Host "Reference build failed - see Data\reference_run.log (the SQL pipeline itself finished)" -ForegroundColor Red }
 
-Write-Host "Done. Gold table: gold.av_readiness_region_month" -ForegroundColor Green
+Write-Host ">>> 04_av_evidence_models.py (GLM cross-check)" -ForegroundColor Yellow
+& $py (Join-Path $PSScriptRoot "python\04_av_evidence_models.py")
+if ($LASTEXITCODE -ne 0) { Write-Host "AV evidence cross-check reported a FAIL" -ForegroundColor Red }
+
+Write-Host ">>> Export Gold and compare with the reference" -ForegroundColor Yellow
+$exportDir = Join-Path $PSScriptRoot "Data\gold_export"
+New-Item -ItemType Directory -Force -Path $exportDir | Out-Null
+$goldCsv = Join-Path $exportDir "gold_av_readiness_region_month.csv"
+$cols = & $sqlcmd -S $ServerInstance -E -C -b -f 65001 -d av_ready_saudi_dw -h -1 -W -Q "SET NOCOUNT ON; SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('gold.av_readiness_region_month') ORDER BY column_id;"
+$rows = & $sqlcmd -S $ServerInstance -E -C -b -f 65001 -d av_ready_saudi_dw -h -1 -W -w 65535 -s "," -Q "SET NOCOUNT ON; SELECT * FROM gold.av_readiness_region_month ORDER BY region_code, month_start;"
+$lines = @((($cols | Where-Object { $_ -ne "" }) -join ",")) + ($rows | Where-Object { $_ -ne "" })
+[System.IO.File]::WriteAllLines($goldCsv, $lines, (New-Object System.Text.UTF8Encoding($false)))
+$rrCols = & $sqlcmd -S $ServerInstance -E -C -b -f 65001 -d av_ready_saudi_dw -h -1 -W -Q "SET NOCOUNT ON; SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('prep.av_relative_risk') ORDER BY column_id;"
+$rrRows = & $sqlcmd -S $ServerInstance -E -C -b -f 65001 -d av_ready_saudi_dw -h -1 -W -w 65535 -s "`t" -Q "SET NOCOUNT ON; SELECT * FROM prep.av_relative_risk ORDER BY event_source, factor, condition_code;"
+$rrLines = @((($rrCols | Where-Object { $_ -ne "" }) -join "`t")) + ($rrRows | Where-Object { $_ -ne "" })
+# tab-separated because evidence_note contains commas
+[System.IO.File]::WriteAllLines((Join-Path $exportDir "av_relative_risk.tsv"), $rrLines, (New-Object System.Text.UTF8Encoding($false)))
+Write-Host "Gold exported: $goldCsv"
+& $py (Join-Path $PSScriptRoot "python\02_reference_gold.py") --compare
+if ($LASTEXITCODE -ne 0) { Write-Host "SQL Gold differs from the reference" -ForegroundColor Red }
+
+if (Test-Path (Join-Path $PSScriptRoot "python\05_readiness_model.py")) {
+    Write-Host ">>> 05_readiness_model.py" -ForegroundColor Yellow
+    & $py (Join-Path $PSScriptRoot "python\05_readiness_model.py")
+    if ($LASTEXITCODE -ne 0) { Write-Host "Readiness model failed" -ForegroundColor Red }
+}
+
+Write-Host "Done. Gold table: gold.av_readiness_region_month (export: Data\gold_export\)" -ForegroundColor Green
