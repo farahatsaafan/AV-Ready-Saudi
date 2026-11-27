@@ -1,9 +1,9 @@
 # دليل تشغيل المشروع لفريق العمل (Team Setup Guide)
 
-الدليل ده بيوضح إزاي أي حد في التيم ينزّل المشروع والداتا ويشغّل الـ pipeline كله (Bronze → Silver → Gold)
+الدليل ده بيوضح إزاي أي حد في التيم ينزّل المشروع والداتا ويشغّل الـ pipeline كله (Bronze → Silver → Gold → EDA والموديلات)
 على جهازه، سواء ماك أو ويندوز. التصميم الحالي: داتا حقيقية بس، العلاقات بين الداتا متعرّفة الأول،
 وجدول Gold واحد (`gold.av_readiness_region_month`). التفاصيل في
-[05_relations_and_lineage.md](05_relations_and_lineage.md).
+[05_relations_and_lineage.md](05_relations_and_lineage.md)، والـ ERD في [07_erd.md](07_erd.md).
 
 ---
 
@@ -14,10 +14,10 @@
 | SQL Server | SQL Server 2022 في Docker (container اسمه `sql2022`) | SQL Server محلي (Express أو Developer) |
 | أداة الاستعلام | VS Code + mssql extension، أو DataGrip | SSMS أو VS Code |
 | sqlcmd | موجود جوه الـ container | SQL Server command-line tools (sqlcmd) |
-| Python | Python 3.10+ | Python 3.10+ (على الـ PATH) |
+| Python | Python 3.9+ | Python 3.9+ (على الـ PATH) |
 | Git | ✓ | ✓ |
 
-الـ scripts بتعمل `.venv` وتنزّل `openpyxl` و`pandas` و`numpy` لوحدها أول مرة.
+الـ scripts بتعمل `.venv` وتنزّل `openpyxl` و`pandas` و`numpy` و`statsmodels` و`scipy` و`scikit-learn` و`matplotlib` لوحدها أول مرة.
 
 ---
 
@@ -36,11 +36,12 @@ cd AV-Ready-Saudi
   ```text
   AV-Ready-Saudi/Data/raw/noaa_global_hourly/2021 ... 2025/
   AV-Ready-Saudi/Data/raw/gastat/
+  AV-Ready-Saudi/Data/raw/gastat_population/
   AV-Ready-Saudi/Data/raw/ca_dmv_disengagements/
   AV-Ready-Saudi/Data/raw/ca_dmv_mileage/
   AV-Ready-Saudi/Data/raw/nhtsa_sgo/
   ```
-* الـ zip فيه بالظبط الملفات اللي الـ pipeline بيقراها (114 ملف). تفاصيل كل مصدر في
+* الـ zip فيه بالظبط الملفات اللي الـ pipeline بيقراها (115 ملف). تفاصيل كل مصدر في
   [DATA_SOURCES.md](DATA_SOURCES.md).
 
 ### الخطوة 3: شغّل الـ pipeline
@@ -62,10 +63,15 @@ powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1 -ServerInstance "loc
 الـ script بيعمل بالترتيب:
 1. `python/00_land_raw.py`: بيحوّل `Data/raw` لـ `Data/landing/*.tsv` (شكل الملف بس، القيم زي ما هي).
 2. `sql/00_init.sql` → `01_bronze.sql` → `02_silver.sql` → `03_gold.sql` مع الـ load procedures بتاعتهم.
-3. `sql/quality/*.sql`: validation وreconciliation وchecks الـ Gold ونسب الداتا وrollback demo.
-4. `python/02_reference_gold.py`: بناء مستقل بـ pandas للمقارنة مع نتيجة SQL.
+3. `sql/quality/*.sql`: validation وreconciliation وchecks الـ Gold ونسب الداتا الـ 3 views وrollback demo،
+   وبعدها `sql/04_analysis.sql` (الـ EDA: ROLLUP / CUBE / GROUPING SETS / window functions).
+4. `python/02_reference_gold.py`: بناء مستقل بـ pandas لنفس القواعد.
+5. `python/04_av_evidence_models.py`: مراجعة الـ relative risks بالـ GLMs + الـ forest plot.
+6. تصدير جدول Gold لـ `Data/gold_export/` ومقارنته عمود بعمود بالـ reference (`--compare`).
+7. `python/05_readiness_model.py`: الـ readiness score والـ clustering والـ supervised test والـ sensitivity،
+   وبيكتب `docs/reports/04_eda_and_models.md` والرسومات في `docs/figures/`.
 
-لازم كل الـ checks تطلع **PASS**.
+لازم كل الـ checks تطلع **PASS**، والمقارنة في الخطوة 6 تطلع `RESULT: PASS`. التشغيل الكامل بياخد حوالي 7 دقايق على الماك.
 
 ### لو عندك database قديمة من التصميم القديم
 مش محتاج تعمل حاجة. `sql/00_init.sql` بيمسح جداول الـ Star Schema القديمة وobjects الـ semantic / ml
