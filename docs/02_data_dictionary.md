@@ -137,6 +137,17 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 | `alias_key` (PK) | NVARCHAR(60) | NO | normalised region label (lower case, no spaces/hyphens/"region"/"province") |
 | `region_code` (FK) | CHAR(3) | NO | Saudi administrative region code (3 letters) |
 
+## silver.dim_condition (Silver)
+
+| Column | Type | Null | Description |
+|---|---|---|---|
+| `condition_code` (PK) | VARCHAR(25) | NO | condition key of vocabulary v2: dust, haze_dry, fog_moist, rain, normal (hour buckets), obscured_unspecified, unknown (NHTSA only), day, night (light) |
+| `factor` | VARCHAR(10) | NO | weather / light |
+| `priority` | TINYINT | YES | hour-bucket priority, 1 wins (dust > haze_dry > fog_moist > rain > normal); NULL = not an hour bucket |
+| `label` | NVARCHAR(80) | NO | readable name of the condition |
+| `rule_text` | NVARCHAR(400) | NO | the exact WMO 4677 / 4680 / METAR (AU1) code rule, visibility and dew-point rule that defines the condition |
+| `us_av_coverage` | VARCHAR(30) | NO | uncovered (no US AV evidence: dust), covered, reference, nhtsa_category, excluded |
+
 ## silver.dim_station (Silver)
 
 | Column | Type | Null | Description |
@@ -156,11 +167,24 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 |---|---|---|---|
 | `file_key` | NVARCHAR(80) | NO | part of the workbook file name |
 | `sheet_name` | NVARCHAR(20) | NO | worksheet name |
-| `metric` (PK) | VARCHAR(30) | NO | serious / serious_within / serious_outside / deaths / injuries |
+| `metric` (PK) | VARCHAR(30) | NO | what the cells hold: accident metrics, road metrics, official rates per 100k, region service metrics, traffic_monthly |
 | `data_year` (PK) | SMALLINT | NO | year the value refers to |
 | `col_num` | INT | NO | Excel column that holds the value |
 | `first_row` | INT | NO | first data row |
 | `last_row` | INT | NO | last data row |
+
+## silver.gastat_traffic_map (Silver)
+
+| Column | Type | Null | Description |
+|---|---|---|---|
+| `data_year` (PK) | SMALLINT | NO | year the traffic block describes (2021-2025) |
+| `file_key` | NVARCHAR(80) | NO | GASTAT workbook (matched with LIKE) |
+| `sheet_name` | NVARCHAR(20) | NO | sheet of the monthly traffic table |
+| `layout` | VARCHAR(20) | NO | car_truck_pairs (2021, 2022: region per column pair, months on rows) / region_rows (2023-2025: region per row, months on columns) |
+| `header_row` | INT | NO | row holding the region names (car_truck_pairs) or the month names (region_rows) |
+| `first_row` | INT | NO | first data row (January for car_truck_pairs; first region for region_rows) |
+| `last_row` | INT | NO | last data row |
+| `definition` | VARCHAR(40) | NO | avg_daily_per_count_point / total_div_points_days |
 
 ## silver.reject_log (Silver)
 
@@ -184,6 +208,8 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 | `report_type` (PK) | VARCHAR(10) | NO | report type (trimmed) |
 | `vis_m` | INT | YES | visibility in metres (NULL if missing or suspect) |
 | `temp_c` | DECIMAL(5,1) | YES | air temperature degC |
+| `dew_c` | DECIMAL(5,1) | YES | dew point in degC, parsed from DEW exactly like TMP (+9999 = missing; quality 2/3/6/7 -> NULL) |
+| `dew_spread_c` | DECIMAL(5,1) | YES | temp_c - dew_c (small = moist air: fog / mist; large = dry air: dust haze) |
 | `wind_ms` | DECIMAL(5,1) | YES | wind speed m/s |
 | `precip_1h_mm` | DECIMAL(6,1) | YES | 1-hour precipitation mm |
 | `mw_code` | CHAR(2) | YES | manual present-weather code (WMO 4677) |
@@ -198,6 +224,8 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 | `is_rain` | BIT | NO | rain/precipitation reported or measured |
 | `is_low_vis` | BIT | NO | visibility < 5 km |
 | `is_night` | BIT | NO | sun below the horizon (elevation < -0.833 deg) |
+| `is_hot40` | BIT | NO | temp_c >= 40 degC |
+| `is_hot45` | BIT | NO | temp_c >= 45 degC |
 | `source_file` | NVARCHAR(400) | NO | raw file the row came from (path under Data/raw) |
 | `source_row_num` | INT | NO | line number in the raw file |
 | `dw_create_date` | DATETIME2 | NO | time the Silver row was written |
@@ -239,11 +267,41 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 |---|---|---|---|
 | `region_code` (PK) | CHAR(3) | NO | Saudi administrative region (silver.dim_region) |
 | `data_year` (PK) | SMALLINT | NO | converted from Arabic-Indic digits |
-| `population` | INT | NO | all nationalities, both genders |
-| `population_saudi` | INT | NO | Saudi nationals (both genders) |
-| `population_non_saudi` | INT | NO | non-Saudi residents (both genders) |
+| `population` | INT | NO | all nationalities, both genders: census table count (2010-2022) or GASTAT's own denominator recovered from its published rate (2023-2025) |
+| `population_saudi` | INT | YES | Saudi nationals (census rows only; NULL for rate-implied rows) |
+| `population_non_saudi` | INT | YES | non-Saudi residents (census rows only; NULL for rate-implied rows) |
+| `population_basis` | VARCHAR(30) | NO | census_2022_table (2010-2022) / gastat_rate_implied (2023-2025) |
+| `basis_detail` | NVARCHAR(200) | NO | how the number was obtained, e.g. serious x 100000 / official_serious_per_100k (workbook, sheet) |
 | `source_file` | NVARCHAR(400) | NO | census CSV the values were read from |
 | `dw_create_date` | DATETIME2 | NO | Silver load time |
+
+## silver.traffic_region_month (Silver)
+
+| Column | Type | Null | Description |
+|---|---|---|---|
+| `region_code` (PK) | CHAR(3) | NO | administrative region (FK silver.dim_region) |
+| `month_start` (PK) | DATE | NO | first day of the month |
+| `data_year` | SMALLINT | NO | calendar year |
+| `month_num` | TINYINT | NO | 1-12 |
+| `adt_per_point` | DECIMAL(12,1) | NO | average daily intercity vehicles per count point: Car + Truck (2021-2022) or month total / count points / days (2023-2025) |
+| `total_vehicles` | DECIMAL(14,1) | YES | month total over the region's count points (2023-2025; NULL for 2021-2022) |
+| `count_points` | INT | YES | number of traffic count points in the region (2023-2025) |
+| `definition` | VARCHAR(40) | NO | avg_daily_per_count_point (2021-2022) / total_div_points_days (2023-2025) |
+| `traffic_month_index` | DECIMAL(6,3) | NO | adt_per_point / mean of the region's 12 months of that year (comparable across the two definitions) |
+| `source_file` | NVARCHAR(400) | NO | GASTAT workbook |
+| `source_sheet` | NVARCHAR(20) | NO | sheet of the workbook |
+| `dw_create_date` | DATETIME2 | NO | load timestamp |
+
+## silver.region_service_2025 (Silver)
+
+| Column | Type | Null | Description |
+|---|---|---|---|
+| `region_code` (PK) | CHAR(3) | NO | administrative region (FK silver.dim_region) |
+| `response_within_s` | INT | NO | average ambulance response time within cities, seconds (GASTAT 2025, sheet 5-11, MM:SS) |
+| `response_outside_s` | INT | NO | average ambulance response time outside cities, seconds (GASTAT 2025, sheet 5-11) |
+| `registered_vehicles` | BIGINT | NO | vehicles registered in the region (GASTAT 2025 sheet 4-1-2) |
+| `source_file` | NVARCHAR(400) | NO | GASTAT workbook |
+| `dw_create_date` | DATETIME2 | NO | load timestamp |
 
 ## silver.dmv_disengagement (Silver)
 
@@ -299,7 +357,7 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 | `w_dust` | BIT | NO | weather flag dust storm |
 | `w_wind` | BIT | NO | weather flag severe wind |
 | `w_unknown` | BIT | NO | weather unknown |
-| `weather_bucket` | VARCHAR(10) | NO | dust (Dust Storm) / fog_haze (Fog/Smoke/Haze) / rain (Rain or Snow) / normal / unknown |
+| `weather_bucket` (FK) | VARCHAR(25) | NO | FK silver.dim_condition: dust (Dust Storm) / obscured_unspecified (Fog/Smoke/Haze) / rain (Rain or Snow) / normal (Clear, Cloudy, Partly Cloudy, Severe Wind) / unknown |
 | `is_night` | BIT | YES | sun below the horizon (elevation < -0.833 deg) |
 | `in_scope` | BIT | NO | CA/AZ/TX and incident year 2021-2025 |
 | `dw_create_date` | DATETIME2 | NO | time the Silver row was written |
@@ -316,15 +374,20 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 | `temp_max_c` | DECIMAL(5,1) | YES | max temperature degC |
 | `wind_max_ms` | DECIMAL(5,1) | YES | max wind m/s |
 | `precip_mm` | DECIMAL(6,1) | YES | precipitation mm |
+| `dew_spread_c` | FLOAT | YES | mean temperature - dew point of the hour's reports (degC) |
+| `min_dew_spread_c` | DECIMAL(5,1) | YES | smallest temperature - dew point in the hour (fog_moist rule: <= 2.5 degC) |
 | `is_dust` | BIT | NO | dust or sand reported |
 | `is_haze` | BIT | NO | haze or smoke reported |
 | `is_fog` | BIT | NO | fog reported |
 | `is_low_vis` | BIT | NO | visibility < 5 km |
 | `is_obscured` | BIT | NO | dust OR haze OR fog OR visibility < 5 km |
-| `is_fog_haze` | BIT | NO | obscured hour WITHOUT any dust report (fog, haze/smoke, mist, low visibility) |
-| `is_rain` | BIT | NO | rain/precipitation reported or measured |
+| `is_fog_moist` | BIT | NO | obscured, no dust, and a fog code or min spread <= 2.5 degC |
+| `is_haze_dry` | BIT | NO | obscured, no dust, not fog_moist |
+| `is_rain` | BIT | NO | precipitation reported in the hour (raw flag; the hour is a rain hour only if not obscured) |
 | `is_night` | BIT | NO | sun below the horizon (elevation < -0.833 deg) |
-| `hour_bucket` | VARCHAR(10) | NO | dust > fog_haze > rain > normal |
+| `is_hot40` | BIT | NO | a report >= 40 degC in the hour |
+| `is_hot45` | BIT | NO | a report >= 45 degC in the hour |
+| `hour_bucket` (FK) | VARCHAR(25) | NO | FK silver.dim_condition; priority dust > haze_dry > fog_moist > rain > normal |
 
 ## prep.weather_station_day (prep (Gold work))
 
@@ -333,38 +396,42 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 | `station_id` (PK) | CHAR(11) | NO | NOAA station id |
 | `local_date` (PK) | DATE | NO | local date |
 | `hours_observed` | INT | NO | hours with at least one report |
-| `dust_hours` | INT | NO | hours with dust |
-| `fog_haze_hours` | INT | NO | hours that were obscured without any dust report (fog / haze / mist / low visibility) |
+| `dust_hours` | INT | NO | hours whose bucket is dust |
+| `haze_dry_hours` | INT | NO | hours whose bucket is haze_dry |
+| `fog_moist_hours` | INT | NO | hours whose bucket is fog_moist |
+| `rain_hours` | INT | NO | hours whose bucket is rain (precipitation and not obscured) |
+| `normal_hours` | INT | NO | hours whose bucket is normal |
 | `obscured_hours` | INT | NO | hours with dust OR haze OR fog OR visibility < 5 km |
-| `rain_hours` | INT | NO | rain hours |
-| `day_type` | VARCHAR(10) | NO | >= 3 obscured hours: dust or fog_haze (whichever has more hours, ties -> dust); else rain (>= 1 rain hour); else normal |
+| `day_type` (FK) | VARCHAR(25) | NO | FK silver.dim_condition; silver.fn_day_type: >= 3 obscured hours -> the largest of dust / haze_dry / fog_moist (ties in that order); else rain (>= 1 rain hour); else normal |
 
 ## prep.saudi_region_month (prep (Gold work))
 
 | Column | Type | Null | Description |
 |---|---|---|---|
 | `region_code` (PK) | CHAR(3) | NO | Saudi administrative region code (3 letters) |
-| `station_id` | CHAR(11) | NO | NOAA station id |
+| `station_id` (FK) | CHAR(11) | NO | NOAA station id |
 | `month_start` (PK) | DATE | NO | first day of the month |
 | `hours_observed` | INT | YES | hours with at least one report |
 | `temp_mean_c` | DECIMAL(5,1) | YES | mean of hourly temperatures degC |
 | `temp_max_c` | DECIMAL(5,1) | YES | max temperature degC |
 | `wind_max_ms` | DECIMAL(5,1) | YES | max wind m/s |
-| `rain_mm` | DECIMAL(8,1) | YES | sum of 1-hour precipitation mm |
-| `dust_hours` | INT | YES | hours with dust |
+| `mean_dew_spread_c` | FLOAT | YES | mean temperature - dew point over the month's hours |
+| `dust_hours` | INT | YES | hours with bucket dust |
+| `haze_dry_hours` | INT | YES | hours with bucket haze_dry |
+| `fog_moist_hours` | INT | YES | hours with bucket fog_moist |
+| `rain_hours` | INT | YES | hours with bucket rain |
+| `normal_hours` | INT | YES | hours with bucket normal |
 | `haze_hours` | INT | YES | hours with haze |
 | `fog_hours` | INT | YES | hours with fog |
 | `low_vis_hours` | INT | YES | hours with visibility < 5 km |
-| `obscured_hours` | INT | YES | hours with dust OR haze OR fog OR visibility < 5 km |
-| `fog_haze_hours` | INT | YES | obscured hours without dust in the month |
-| `rain_hours` | INT | YES | rain hours |
-| `normal_hours` | INT | YES | normal hours |
 | `night_hours` | INT | YES | night hours |
+| `hot40_hours` | INT | YES | hours with a report >= 40 degC |
+| `hot45_hours` | INT | YES | hours with a report >= 45 degC |
 | `days_observed` | INT | YES | days with data |
 | `dust_days` | INT | YES | days with any dust hour |
-| `dust_type_days` | INT | YES | days whose day type is dust |
-| `fog_haze_days` | INT | YES | days whose day type is fog_haze |
-| `obscured_days` | INT | YES | dust_type_days + fog_haze_days |
+| `dust_type_days` | INT | YES | days of day type dust |
+| `haze_dry_days` | INT | YES | days of day type haze_dry |
+| `fog_moist_days` | INT | YES | days of day type fog_moist |
 | `rain_days` | INT | YES | rain days |
 | `normal_days` | INT | YES | normal days |
 
@@ -374,13 +441,18 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 |---|---|---|---|
 | `event_source` (PK) | VARCHAR(20) | NO | nhtsa_crash / dmv_disengagement |
 | `factor` (PK) | VARCHAR(10) | NO | weather / light |
-| `level` (PK) | VARCHAR(10) | NO | weather: normal, rain, fog_haze, dust / light: day, night |
-| `events` | INT | NO | events in the level |
-| `event_share` | FLOAT | YES | share of events |
-| `exposure` | FLOAT | YES | fleet miles on those days (disengagements) |
-| `exposure_share` | FLOAT | YES | share of exposure |
-| `relative_risk` | FLOAT | YES | (event share / exposure share) / same for reference level |
-| `used_in_index` | BIT | YES | 1 if events >= 30 |
+| `condition_code` (PK) | VARCHAR(25) | NO | FK silver.dim_condition: the level compared with the reference (normal / day) |
+| `events` | INT | NO | AV events in the analysed strata at this level |
+| `exposure` | FLOAT | YES | station-hours of the state (NHTSA) or DMV fleet miles (DMV) at this level in the analysed strata |
+| `rr_crude` | FLOAT | YES | pooled ratio without strata (NHTSA: event share / state-weighted exposure share; DMV: events per mile / normal) |
+| `rr_adjusted` | FLOAT | YES | Mantel-Haenszel rate ratio over the strata (reference level = 1) |
+| `ci_low` | FLOAT | YES | 95 % CI lower bound: Greenland-Robins variance x max(1, dispersion) |
+| `ci_high` | FLOAT | YES | 95 % CI upper bound |
+| `n_strata` | INT | NO | number of strata (NHTSA: state x month with >= 1 crash; DMV: month x weekday class) |
+| `dispersion` | FLOAT | YES | Pearson chi2 / df of the fitted stratified model (overdispersion factor) |
+| `adjustment` | VARCHAR(40) | NO | how the ratio is stratified |
+| `used_in_index` | BIT | NO | 1 = applied in Gold: AV crash ratio with >= 30 events and CI lower bound > 1 |
+| `evidence_note` | VARCHAR(120) | NO | why it is used or not (significant penalty - used / no detectable penalty / implausible protective - artefact / no events - uncovered / takeover signal - reported, not a crash weight) |
 
 ## gold.av_readiness_region_month (Gold)
 
@@ -389,7 +461,7 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 | `region_code` (PK) | CHAR(3) | NO | Saudi administrative region code (3 letters) |
 | `region_name_en` | NVARCHAR(50) | NO | region name, English |
 | `region_name_ar` | NVARCHAR(50) | NO | region name, Arabic |
-| `weather_station_id` | CHAR(11) | NO | NOAA station that represents the region |
+| `weather_station_id` (FK) | CHAR(11) | NO | NOAA station that represents the region |
 | `year` | SMALLINT | NO | calendar year |
 | `month` | TINYINT | NO | calendar month |
 | `month_start` (PK) | DATE | NO | first day of the month |
@@ -397,52 +469,58 @@ Bronze columns are all text by design; Silver/prep/Gold are typed.
 | `wx_hours_observed` | INT | YES | hours of the month with weather data |
 | `wx_hours_in_month` | INT | NO | hours in the month |
 | `wx_coverage_pct` | DECIMAL(5,1) | YES | observed / total hours % |
+| `wx_complete` | BIT | NO | 1 = weather present and coverage >= 80 % (filter for every weather analysis) |
 | `temp_mean_c` | DECIMAL(5,1) | YES | mean of hourly temperatures degC |
 | `temp_max_c` | DECIMAL(5,1) | YES | max temperature degC |
 | `wind_max_ms` | DECIMAL(5,1) | YES | max wind m/s |
-| `rain_mm` | DECIMAL(8,1) | YES | sum of 1-hour precipitation mm |
-| `share_dust_hours` | DECIMAL(6,4) | YES | share of hours with dust |
+| `mean_dew_spread_c` | DECIMAL(5,1) | YES | mean temperature - dew point of the month (small = moist) |
+| `share_normal_hours` | DECIMAL(6,4) | YES | share of hours with bucket normal (the five v2 shares sum to 1) |
+| `share_rain_hours` | DECIMAL(6,4) | YES | share of hours with bucket rain (precipitation and not obscured) |
+| `share_fog_moist_hours` | DECIMAL(6,4) | YES | share of hours with bucket fog_moist (obscured, no dust, fog code or spread <= 2.5 degC) |
+| `share_haze_dry_hours` | DECIMAL(6,4) | YES | share of hours with bucket haze_dry (obscured, no dust, dry air) |
+| `share_dust_hours` | DECIMAL(6,4) | YES | share of hours with dust or sand reported |
 | `share_haze_hours` | DECIMAL(6,4) | YES | share of hours with haze/smoke |
 | `share_fog_hours` | DECIMAL(6,4) | YES | share of hours with fog |
 | `share_low_vis_hours` | DECIMAL(6,4) | YES | share of hours with visibility < 5 km |
-| `share_obscured_hours` | DECIMAL(6,4) | YES | share of hours with dust OR haze OR fog OR visibility < 5 km (= dust + fog/haze) |
-| `share_fog_haze_hours` | DECIMAL(6,4) | YES | share of hours obscured without any dust report (fog / haze / mist / low visibility) |
-| `share_rain_hours` | DECIMAL(6,4) | YES | share of rain hours (not obscured) |
-| `share_normal_hours` | DECIMAL(6,4) | YES | share of normal hours |
 | `share_night_hours` | DECIMAL(6,4) | YES | share of night hours |
+| `share_hot40_hours` | DECIMAL(6,4) | YES | share of hours with a report >= 40 degC |
+| `share_hot45_hours` | DECIMAL(6,4) | YES | share of hours with a report >= 45 degC |
 | `days_observed` | INT | YES | days with data |
 | `dust_days` | INT | YES | days with any dust hour |
-| `dust_type_days` | INT | YES | day type = dust |
-| `fog_haze_days` | INT | YES | day type = fog_haze |
-| `obscured_days` | INT | YES | dust_type_days + fog_haze_days |
-| `rain_days` | INT | YES | rain days |
-| `normal_days` | INT | YES | normal days |
+| `dust_type_days` | INT | YES | days of day type dust |
+| `haze_dry_days` | INT | YES | days of day type haze_dry |
+| `fog_moist_days` | INT | YES | days of day type fog_moist |
+| `rain_days` | INT | YES | days of day type rain |
+| `normal_days` | INT | YES | days of day type normal |
+| `traffic_adt_per_point` | DECIMAL(12,1) | YES | average daily intercity vehicles per count point (definition in traffic_definition) |
+| `traffic_definition` | VARCHAR(40) | YES | avg_daily_per_count_point (2021-2022) / total_div_points_days (2023-2025) |
+| `traffic_month_index` | DECIMAL(6,3) | YES | month / mean of the region's 12 months of that year (comparable across years) |
 | `acc_year_serious` | INT | YES | serious accidents in the region in that year (GASTAT) |
 | `acc_year_deaths` | INT | YES | deaths in the region in that year |
 | `acc_year_injuries` | INT | YES | injuries in the region in that year |
 | `acc_year_serious_within_cities` | INT | YES | serious accidents within cities (2024-2025) |
 | `acc_year_serious_outside_cities` | INT | YES | serious accidents outside cities (2024-2025) |
 | `acc_share_outside_cities` | DECIMAL(6,4) | YES | outside / (within + outside) |
-| `population` | INT | YES | GASTAT Census 2022 table (2021, 2022 observed) |
-| `population_basis` | VARCHAR(20) | YES | 'census_year' (2021-2022) / 'census_2022' (2023-2025) |
-| `acc_serious_per_100k` | DECIMAL(9,2) | YES | acc_year_serious / population * 100,000 |
+| `population` | INT | YES | population of the same year: census table (2021-2022) / GASTAT's own denominator recovered from its published rate (2023-2025) |
+| `population_basis` | VARCHAR(30) | YES | census_2022_table (2021-2022) / gastat_rate_implied (2023-2025) |
+| `acc_serious_per_100k` | DECIMAL(9,2) | YES | acc_year_serious / population x 100,000 |
 | `acc_deaths_per_100k` | DECIMAL(9,2) | YES | acc_year_deaths / population * 100000 |
 | `acc_injuries_per_100k` | DECIMAL(9,2) | YES | acc_year_injuries / population * 100000 |
 | `road_km_per_1000_people` | DECIMAL(9,3) | YES | whole network / population |
 | `road_km_per_km2` | DECIMAL(9,4) | YES | whole network / area |
 | `intercity_road_km` | DECIMAL(10,1) | YES | total intercity road length of the region in the year (km; NULL for 2021) |
 | `intercity_divided_share` | DECIMAL(6,4) | YES | (highway + dual carriageway) / intercity total |
-| `av_rr_crash_rain` | DECIMAL(9,4) | YES | relative risk of an AV crash in rain (NHTSA) |
-| `av_rr_crash_fog_haze` | DECIMAL(9,4) | YES | relative risk of an NHTSA ADS crash in fog / haze hours vs normal hours (NULL if < 30 crashes, evidence rule) |
-| `av_rr_crash_dust` | DECIMAL(9,4) | YES | NULL: too few AV crashes in dust (evidence rule) |
-| `av_rr_crash_night` | DECIMAL(9,4) | YES | relative risk of an AV crash at night (stored, not in index) |
-| `av_rr_diseng_rain_day` | DECIMAL(9,4) | YES | relative risk of a disengagement on a rain day (CA DMV) |
-| `av_rr_diseng_fog_haze_day` | DECIMAL(9,4) | YES | relative risk of a DMV disengagement per fleet mile on California fog / haze days vs normal days |
-| `av_rr_diseng_dust_day` | DECIMAL(9,4) | YES | NULL: no dust days in the California AV data |
-| `av_crash_risk_index` | DECIMAL(9,4) | YES | condition mix x crash relative risks (1 = normal only) |
-| `av_diseng_risk_index` | DECIMAL(9,4) | YES | day-type mix x disengagement relative risks (1 = normal only) |
+| `response_within_s` | INT | YES | ambulance response time within cities, seconds (GASTAT 2025; same on every row of the region) |
+| `response_outside_s` | INT | YES | ambulance response time outside cities, seconds (GASTAT 2025) |
+| `registered_vehicles_2025` | BIGINT | YES | vehicles registered in the region (GASTAT 2025) |
+| `av_uncovered_share` | DECIMAL(9,6) | YES | share of hours without any US AV evidence (dust) |
+| `av_uncovered_share_cons` | DECIMAL(9,6) | YES | conservative uncovered share: dust + dry haze |
+| `av_crash_multiplier` | DECIMAL(9,6) | YES | 1 + sum over used conditions of share x (RR - 1); today rain only (NHTSA RR) |
+| `env_readiness` | DECIMAL(9,6) | YES | share of hours inside the US AV evidence envelope: sum share x weight, dust 0, rain 1/RR_rain, other covered conditions 1 |
+| `env_readiness_cons` | DECIMAL(9,6) | YES | env_readiness with dry haze weight 0 (Saudi dry haze is mineral dust; California's is mostly smoke) |
 | `src_weather` | NVARCHAR(200) | NO | weather lineage |
 | `src_accidents` | NVARCHAR(400) | YES | accident lineage (workbooks) |
-| `src_av` | NVARCHAR(200) | NO | AV lineage |
+| `src_traffic` | NVARCHAR(200) | YES | GASTAT workbook and sheet of the traffic value |
+| `src_av` | NVARCHAR(200) | NO | which AV evidence produced the av_* columns (prep.av_relative_risk v2: NHTSA state-month MH; DMV month x weekday MH) |
 | `gold_batch_id` | UNIQUEIDENTIFIER | NO | Gold load batch |
 | `gold_loaded_at` | DATETIME2 | NO | time Gold was loaded |

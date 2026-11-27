@@ -63,6 +63,19 @@ Notes on the links
 | `GASTAT_Road_Transport_Statistics_2024_tables.xlsx` | [download](https://www.stats.gov.sa/documents/d/guest/rroad-transport-statistics-2024_en) | `64ce979745d4` |
 | `GASTAT_Road_Transport_Statistics_2025_tables.xlsx` | [download](https://www.stats.gov.sa/documents/20117/2435281/%E2%80%8F%E2%80%8F%E2%80%8F%E2%80%8FRoad+Transport+Statistics+2025+-+EN+%281%29.xlsx/ac687a27-82d7-793a-d497-c2fcbb0cbb73?t=1793612751029) | `d8a570f8d9d3` |
 
+#### Which sheets of the GASTAT workbooks are read (all declared in `silver.gastat_sheet_map` / `gastat_traffic_map`)
+
+No new files were added in design v2 (28 Nov 2026): traffic, the rate denominators and the region-service attributes
+are further sheets of the same four workbooks that were already in Bronze.
+
+| Content | 2022 workbook | 2023 workbook | 2024 workbook | 2025 workbook | Silver table |
+|---|---|---|---|---|---|
+| serious accidents, deaths, injuries (2021, 2022 in the 2022 workbook) | 17, 20 | 34, 37 | 5-1, 5-5 | 5-1-1, 5-6-1 | `accidents_region_year` |
+| road density, intercity road length by type | 12, 7 | 20, 15 | 7-5, 7-2 | 7-2, 7-1-2 | `roads_region_year` |
+| monthly intercity traffic by region (2021 and 2022 blocks in the 2022 workbook) | 14 | 29 | 3-5 | 3-3-1 | `traffic_region_month` |
+| GASTAT's rate per 100,000 (gives its population denominator) | — | 35 (mortality) | 5-4 (serious); 5-2 (mortality, check) | 5-7 (serious); 5-2 (mortality, check) | `population_region_year` |
+| ambulance response time; registered vehicles | — | — | — | 5-11; 4-1-2 | `region_service_2025` |
+
 ### GASTAT Saudi Census 2022 population (`gastat_population/`)
 
 | File | Download | SHA-256 (first 12) |

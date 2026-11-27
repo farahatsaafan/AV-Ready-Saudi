@@ -1,224 +1,249 @@
 # AV-Ready-Saudi — Relations, Lineage and Data Shares
 
-Status: design of 24 Nov 2026 (branch `dev-ali-ezzat`). Replaces the earlier design that used generated telemetry.
-All data in this design is **real** (0 % generated).
+Status: design v2 of 28 Nov 2026 (branch `dev-ali-ezzat`). Replaces the 24 Nov design (fog/haze vocabulary,
+pooled AV ratios, constant AV columns in Gold) and the earlier design that used generated telemetry.
+All data is **real** (0 % generated, imputed or projected). Entity-relationship diagram: [07_erd.md](07_erd.md).
 
 ## 1. Question and output
 
-**Question.** How ready is each Saudi region, month by month, for autonomous vehicles (AVs), judged by the
-environmental conditions AVs actually meet there?
+**Question.** How ready is each Saudi region, by season, for autonomous vehicles (AVs)?
 
-**Output (Gold).** One table, `gold.av_readiness_region_month` — one row per Saudi administrative region per
-calendar month, 2021–2025 (13 × 60 = 780 rows). The machine-learning step turns it into a readiness score per
-region and season, with the conditions that drive the score (SHAP).
+**Output.** One Gold table, `gold.av_readiness_region_month` — one row per Saudi administrative region per calendar
+month, 2021–2025 (13 × 60 = 780 rows). Everything else (EDA in `sql/04_analysis.sql`, the readiness score,
+clustering and the supervised test in `python/05_readiness_model.py`) is computed from that table only.
 
-The result is an **evidence-based estimate**, not a measurement: no AVs drive in Saudi Arabia yet, so AV behaviour
-is learned in the US and transferred through the conditions both places share.
+The result is an **evidence-based estimate**, not a measurement: no AVs drive in Saudi Arabia yet, so AV behaviour is
+taken from US records and transferred through the weather conditions both places share. A Saudi region-month is as
+ready as the share of its hours that fall inside the US AV evidence, penalised only by risks that the US crash data
+shows with confidence.
 
 ## 2. Sources
 
 | # | Family | Source | Period | Grain | Origin | Role |
 |---|---|---|---|---|---|---|
-| 1 | Weather | NOAA NCEI Global Hourly (ISD) — 13 Saudi airport stations, one per region | 2021 – Aug 2025 | one weather report (≈ hourly) | Saudi (observed in KSA, archived by NOAA) | condition mix of each region-month |
-| 2 | Weather | NOAA NCEI Global Hourly — LAX, SFO (CA), PHX (AZ), AUS (TX) | 2021 – Aug 2025 | one weather report | US | exposure: how often each condition occurs where the AV events happen |
-| 3 | Accidents | GASTAT Land/Road Transport Statistics workbooks 2022, 2023, 2024, 2025 (source: Ministerial Committee for Traffic Safety) | 2021–2025 | region × year | Saudi | serious accidents, deaths, injuries, within/outside cities |
-| 4 | AV failures | California DMV AV disengagement reports (drivered, driverless, first-time filers) | Dec 2020 – Nov 2024 | one disengagement | US | events + cause text |
-| 5 | AV failures | California DMV AV mileage reports | Dec 2020 – Nov 2024 | vehicle × month | US | exposure (fleet miles) |
-| 6 | AV crashes | NHTSA Standing General Order — ADS incident reports (2021–2025 archive + current file) | 2021–2025 used | one crash report | US | events with structured weather / lighting / road type |
-| 7 | Roads | GASTAT road network tables (same workbooks as #3): density per person and per km², intercity length by road type | 2022–2025 | region × year | Saudi | road context of each region |
-| 8 | Population | GASTAT Saudi Census 2022 — population 2010–2022 by region, nationality and gender | 2021–2022 used (2022 also for 2023–2025) | region × year | Saudi | denominator of accident rates per 100,000 |
+| 1 | Weather | NOAA NCEI Global Hourly (ISD) — 13 Saudi airport stations, one per region | Jan 2021 – 25 Aug 2025 | one weather report (≈ hourly) | Saudi (observed in KSA, archived by NOAA) | condition mix of each region-month (incl. dew point and heat) |
+| 2 | Weather | NOAA NCEI Global Hourly — LAX, SFO (CA), PHX (AZ), AUS (TX) | same | one weather report | US | exposure: how often each condition occurs where the AV events happen |
+| 3 | Accidents | GASTAT Land / Road Transport Statistics workbooks 2022, 2023, 2024, 2025 | 2021–2025 | region × year | Saudi | serious accidents, deaths, injuries, within / outside cities |
+| 4 | Traffic | same GASTAT workbooks: monthly intercity traffic by region | 2021–2025, every month | region × month | Saudi | the only Saudi *monthly* road variable (seasonality of travel) |
+| 5 | Population | GASTAT Census 2022 table (2010–2022) + GASTAT's own denominator recovered from its published rates (2023–2025) | 2021–2025 used | region × year | Saudi | denominator of rates per 100,000 |
+| 6 | Roads | same GASTAT workbooks: density per person / per km², intercity length by road type | 2022–2025 | region × year | Saudi | infrastructure |
+| 7 | Region service | GASTAT 2025: ambulance response time within / outside cities, registered vehicles | 2025 | region | Saudi | infrastructure / emergency response |
+| 8 | AV failures | California DMV AV disengagement reports (drivered, driverless, first-time filers) | Dec 2020 – Nov 2024 | one disengagement | US | events |
+| 9 | AV exposure | California DMV AV mileage reports | Dec 2020 – Nov 2024 | vehicle × month | US | fleet miles |
+| 10 | AV crashes | NHTSA Standing General Order — ADS incident reports (archive + current file) | 2021–2025 used | one crash | US | events with structured weather / lighting |
 
-Considered and not used (not in the data bundle): KAPSARC 2016–2019 (outside the period),
-UK STATS19, Open-Meteo and CAMS model output (modelled, not observed), Saudi Open Data portal files
-(annual totals already covered by GASTAT, or too small), OSM extract.
+Sources 4, 5 (2023–2025) and 7 are **new sheets of the workbooks already in Bronze** (no new files, no downloads).
+Every link: [DATA_SOURCES.md](DATA_SOURCES.md) · register: [data_source_register.csv](data_source_register.csv).
 
-## 3. Relation diagram
+## 3. Relations
 
-```mermaid
-flowchart LR
-  subgraph Bronze["Bronze (raw, text)"]
-    B1[noaa_hourly]
-    B2[gastat_cells]
-    B3[dmv_disengagements]
-    B4[dmv_mileage]
-    B5[nhtsa_sgo_ads]
-    B6[gastat_population]
-  end
-  subgraph Silver["Silver (clean + reference)"]
-    R1[(dim_region)]
-    R2[(dim_station)]
-    R3[(region_alias)]
-    R4[(gastat_sheet_map)]
-    S1[weather_obs]
-    S2[accidents_region_year]
-    S3[dmv_disengagement]
-    S4[dmv_mileage_monthly]
-    S5[nhtsa_crash]
-    S6[roads_region_year]
-    S7[population_region_year]
-  end
-  subgraph Prep["prep (Gold work tables)"]
-    P1[weather_station_hour]
-    P2[weather_station_day]
-    P3[saudi_region_month]
-    P4[av_relative_risk]
-  end
-  G[["gold.av_readiness_region_month<br/>region × month"]]
-  B1-->S1; B2-->S2; B3-->S3; B4-->S4; B5-->S5; B2-->S6; B6-->S7
-  R2-- station_id -->S1
-  R3-- region label -->S2
-  R4-- sheet / column -->S2
-  S1-->P1-->P2
-  P1-- SA stations -->P3
-  P2-- SA stations -->P3
-  P1-- US stations: hours per condition -->P4
-  P2-- CA days: day type -->P4
-  S5-- crashes per condition -->P4
-  S3-- disengagements per day -->P4
-  S4-- miles per month -->P4
-  P3-- region_code + month -->G
-  S2-- region_code + year -->G
-  S6-- region_code + year -->G
-  S7-- region_code + year -->G
-  P4-- condition -->G
-  R1-- region_code -->G
-```
-
-### The relations
+All relations are declared as **foreign keys** (18, checked "enabled and trusted" by `sql/quality/03_gold_checks.sql`):
+`silver.dim_region` → every regional table and Gold; `silver.dim_station` → `weather_obs`, the prep hour/day/month
+tables and Gold; `silver.dim_condition` → `nhtsa_crash.weather_bucket`, `prep.weather_station_hour.hour_bucket`,
+`prep.weather_station_day.day_type`, `prep.av_relative_risk.condition_code`. Diagram: [07_erd.md](07_erd.md).
 
 | Relation | Join key | Kind |
 |---|---|---|
-| Weather ↔ Accidents | `region_code` + `year` | direct, both Saudi and observed (accidents are annual, so the 12 months of a year carry the same accident values) |
-| Weather ↔ AV events | the **condition vocabulary**: `normal`, `rain`, `fog_haze` (fog, haze, mist or visibility < 5 km without dust), `dust` and `day` / `night` (sun position) | each AV event is classified with the same rules as each Saudi weather hour |
-| Roads ↔ Accidents | `region_code` + `year` | both GASTAT; road network context of the region |
-| Population ↔ Accidents | `region_code` + `year` (2023–2025 use the 2022 census count) | turns accident counts into rates per 100,000 so regions of different size can be compared |
-| AV crashes ↔ US weather | `us_state` (CA→LAX+SFO, AZ→PHX, TX→AUS) | exposure for the crash relative risk |
-| AV disengagements ↔ CA weather ↔ mileage | `date` (event day ↔ CA day type) and `month` (mileage) | exposure for the disengagement relative risk |
+| Weather ↔ Accidents | `region_code` + `year` | both Saudi and observed; accidents are annual, so the 12 months of a year carry the same values |
+| Traffic ↔ Gold | `region_code` + `month_start` | monthly, Saudi |
+| Population / Roads ↔ Accidents | `region_code` + `year` | rates per 100,000; road context |
+| Region service ↔ Gold | `region_code` | 2025 attributes, same on every row of the region |
+| Weather ↔ AV events | **`silver.dim_condition`** (condition vocabulary v2) | Saudi hours, US hours, California days and NHTSA crash categories all carry a `condition_code` FK |
+| AV crashes ↔ US weather | `us_state` + incident month (CA → LAX+SFO, AZ → PHX, TX → AUS) | stratum of the Mantel–Haenszel ratio |
+| AV disengagements ↔ CA weather ↔ mileage | date (CA day type) + month (fleet miles) and weekday class | stratum of the Mantel–Haenszel ratio |
 
-Accidents and AV events are **not** joined row to row — they are different things in different countries. They meet
-in Gold through weather: same region-month row, same condition vocabulary.
+Accidents and AV events are **not** joined row to row — they are different events in different countries. They meet
+in Gold through the condition vocabulary on the same region-month row.
 
 ## 4. Rules
 
-**Weather report → condition flags (Silver).** WMO present-weather codes from manual (`MW1`, WMO 4677) and automated
-(`AW1`, WMO 4680) reports and the METAR-style group (`AU1`):
+### 4.1 Weather report → flags (Silver, `silver.weather_obs`)
+
+WMO present-weather codes from manual (`MW1`, WMO 4677) and automated (`AW1`, WMO 4680) reports and the METAR-style
+group `AU1`; the exact rules are stored in `silver.dim_condition.rule_text`.
 
 | Flag | Rule |
 |---|---|
-| dust | MW 06–09 or 30–35; AU obscuration DU/SA; AU other dust/sand whirls, sandstorm, duststorm |
-| haze / smoke | MW 04–05; AW 04–05; AU obscuration FU/HZ |
-| fog | MW 40–49; AW 30–35; AU obscuration FG |
-| rain | MW 50–69 or 80–99; AW 40–69 or 80–89; AU precipitation DZ/RA/UP; measured 1-hour precipitation > 0 |
+| dust | MW 06–09 or 30–35; AU1 obscuration DU / SA; AU1 other dust/sand whirls, sandstorm, duststorm |
+| haze / smoke | MW 04–05; AW 04–05; AU1 obscuration FU / HZ |
+| fog | MW 40–49; AW 30–35; AU1 obscuration FG |
+| rain | MW 50–69 or 80–99; AW 40–69 or 80–89; AU1 precipitation DZ / RA / UP; measured 1-hour precipitation > 0 |
 | low visibility | visibility < 5 000 m (quality codes 2/3/6/7 discarded) |
 | night | solar elevation < −0.833° (NOAA solar-position equations) |
+| dew point | `DEW` parsed exactly like `TMP`; `dew_spread_c = temp_c − dew_c` |
+| heat | `is_hot40` temp ≥ 40 °C, `is_hot45` temp ≥ 45 °C |
 
-Daily/monthly summary records (`SOD`, `SOM`) are not observations and are removed; duplicate reports
-(same station, timestamp and report type) are removed.
+### 4.2 Condition vocabulary v2 (hour level, identical rules for Saudi and US stations)
 
-**Hour bucket (Gold).** dust › fog_haze (haze / fog / low visibility without dust) › rain › normal.
-**Day type (Gold).** ≥ 3 obscured hours → dust or fog_haze, whichever had more hours (ties → dust); else rain
-(≥ 1 rain hour); else normal. California days use the worse of LAX and SFO.
+Obscured hour = dust OR haze OR fog OR visibility < 5 km. Priority **dust › haze_dry › fog_moist › rain › normal**:
 
-Why dust and fog/haze are kept apart: Saudi obscured hours are 68 % dust; California's (LAX + SFO) are 0 % dust and
-mostly fog, haze and mist. One "obscured" risk would apply a fog risk to dust.
+| Condition | Rule | US AV coverage |
+|---|---|---|
+| `dust` | a dust / sand code in the hour | **uncovered** (no US AV evidence) |
+| `haze_dry` | obscured, no dust, not fog_moist (dry air) | covered |
+| `fog_moist` | obscured, no dust, and a fog code **or** min(temp − dew point) in the hour ≤ 2.5 °C | covered |
+| `rain` | precipitation reported and the hour is not obscured | covered |
+| `normal` | none of the above | reference |
 
-**Population (Gold).** The census table gives each region's population for 2010–2022. Gold uses the same year when it
-exists (2021, 2022) and the latest census count (2022) for 2023–2025, flagged in `population_basis`; nothing is
-projected or interpolated. Our serious-accident rate is 7–17 % above GASTAT's own published rate for 2024–2025 (which
-uses mid-year estimates): the gap is the population growth since 2022, and the order of the regions is the same.
+**Why split fog/haze by dew point.** Saudi "fog/haze" is not California fog. Of the 8 672 Saudi obscured hours without
+dust, only 5.7 % carry a fog code and 64.5 % a haze code; the median temperature–dew-point spread is 5.6 °C (> 5 °C in
+50.7 %), i.e. dry air: mineral dust haze. California's (LAX + SFO) are 68.7 % moist (spread ≤ 2.5 °C, median 1.6 °C).
+Jazan's are 0 % fog code, 94.8 % haze, 71 % with spread > 5 °C. Applying a California fog ratio to Saudi dust haze is
+what put Jazan and the Eastern Province on top of the old risk index.
 
-**Relative risk (Gold, `prep.av_relative_risk`).**
+Result, 2021–2025 station-hours: Saudi (13 stations) dust 3.49 %, haze_dry 1.16 %, fog_moist 0.51 %, rain 0.51 %,
+normal 94.34 %; California (LAX + SFO) fog_moist 4.01 %, haze_dry 1.61 %, rain 2.75 %, dust 0.00 %.
+Hours ≥ 40 °C: Saudi 6.1 %, Phoenix 7.5 % (where AV fleets run commercially), California 0 %.
+
+**Day type** (`silver.fn_day_type`, the only implementation, used for Saudi days and California days): if
+dust + haze_dry + fog_moist hours ≥ 3 → the largest of the three (ties: dust › haze_dry › fog_moist); else `rain` if
+≥ 1 rain hour; else `normal`. A California day takes the maximum hours of each kind over LAX and SFO.
+
+**NHTSA categories.** NHTSA has one "Fog/Smoke/Haze" box, so it maps to `obscured_unspecified` (its US exposure is
+fog_moist + haze_dry hours); Dust Storm → `dust`; Rain or Snow → `rain`; Clear / Cloudy / Partly Cloudy / Severe Wind →
+`normal`; otherwise `unknown` (excluded).
+
+### 4.3 AV evidence (`prep.av_relative_risk`): stratified relative risks
+
+The pooled ratios of the 24 Nov design were confounded: a month's fleet miles were spread evenly over its days, but
+98 % of disengagements happen Monday–Friday, and fleets and seasons move together. v2 compares like with like:
 
 ```
-crash:          RR(c) = [P(crash in c) / P(hour in c)] / [P(crash in normal) / P(hour in normal)]
-                P(hour in c) = Σ_state  w_state · share of the state's station-hours in c,
-                w_state = share of the crashes that happened in that state
-disengagement:  RR(c) = [disengagements on CA days of type c / fleet miles on those days]
-                      / [same for normal days]
-                fleet miles of a day = that month's DMV miles / days in month
+Mantel-Haenszel rate ratio of condition c vs normal over strata s (T = person-time):
+  RR_MH = Σ_s e_c,s · T_n,s / T_s  ÷  Σ_s e_n,s · T_c,s / T_s ,   T_s = T_c,s + T_n,s
+  Var(ln RR_MH) = Σ_s (e_c,s + e_n,s) · T_c,s · T_n,s / T_s²  ÷  [ (Σ e_c,s T_n,s / T_s) · (Σ e_n,s T_c,s / T_s) ]
+  95 % CI = exp(ln RR ± 1.96 · √(Var · max(1, φ)))     φ = Pearson χ² / df of the fitted stratified model
+NHTSA:  in-scope crashes (CA/AZ/TX, 2021-2025, weather known); strata = state × incident month with >= 1 crash;
+        T = station-hours of the state (CA = LAX + SFO)
+DMV:    one row per California date in months with fleet miles > 0; T of a day = month fleet miles / days in month
+        (this is how mileage contributes); events = disengagements that date; strata = month × weekday class
 ```
 
-**Evidence rule.** A relative risk is used only if its level has at least 30 events; otherwise Gold stores NULL and the
-index treats the condition as neutral (1).
+φ (overdispersion) is ≈ 0.5 for NHTSA (no correction) and ≈ 8.9 for DMV (one day of one fleet can carry dozens of
+disengagements; a plain Poisson CI would be three times too narrow).
 
-**Indices (Gold).**
-```
-av_crash_risk_index  = share_normal + share_rain·RR_crash(rain) + share_fog_haze·RR_crash(fog_haze) + share_dust·RR_crash(dust)
-av_diseng_risk_index = normal_days/days + rain_days/days·RR_diseng(rain) + fog_haze_days/days·RR_diseng(fog_haze)
-                     + dust_type_days/days·RR_diseng(dust)
-```
-1 = a month made only of normal conditions. The crash night ratio is stored (`av_rr_crash_night`) but not multiplied
-into the index: its exposure is hours of darkness, not AV miles driven at night, so it mostly measures how little the
-fleets drive at night.
+**Evidence rule** (agreed with Ali, 27 Nov 2026). A ratio is applied in Gold only if it comes from **AV crashes** (a
+safety outcome), has **≥ 30 events** and its **95 % CI lower bound > 1**. A ratio < 1 for an adverse condition is never
+used. A significant **disengagement** ratio is reported, not applied: a disengagement is a precautionary take-over,
+42 % of them come from one company (MAY MOBILITY) and 81.5 % from three. Conditions with no US events (dust) are
+**uncovered**.
 
-## 5. Lineage (Gold column → Silver → Bronze → raw)
+The same ratios are re-estimated with GLMs in `python/04_av_evidence_models.py` (statsmodels): Poisson with the same
+strata as fixed effects must agree with MH within ±10 % (it does: 0.7–4.9 %); Negative Binomial with month and
+day-of-week fixed effects, per manufacturer and with SFO-only / LAX-only day types are robustness checks; a hold-out year
+tests whether weather improves the prediction of disengagements (it does not).
+
+### 4.4 Gold measures
+
+```
+av_uncovered_share      = share_dust_hours
+av_uncovered_share_cons = share_dust_hours + share_haze_dry_hours
+av_crash_multiplier     = 1 + Σ_{used c} share_c · (RR_c − 1)                  (today: rain only)
+env_readiness           = Σ_c share_c · w_c,  w_dust = 0, w_c = 1/RR_c for used c, w_c = 1 for other covered c
+env_readiness_cons      = env_readiness with w_haze_dry = 0   (Saudi dry haze is mineral dust; California's is mostly smoke)
+```
+
+Computed from hour counts (exact), not from the rounded shares.
+
+### 4.5 Traffic and population
+
+**Traffic** (`silver.traffic_region_month`, 13 × 60 = 780 rows, 0 rejects). 2021–2022: `Land_Transport_Statistics_2022`
+sheet 14, average daily Car + Truck per count point by month (header "Ryiadh" mapped through `region_alias`).
+2023–2025: sheets 29 / 3-5 / 3-3-1, month total ÷ count points ÷ days in month. Levels of the two definitions are not
+comparable, so `traffic_month_index` = month ÷ mean of the region's 12 months of that year is. 2023 regional totals add
+up to GASTAT's national total row (0.000 % difference).
+
+**Population** (`silver.population_region_year`, 208 rows). 2010–2022: census table (`census_2022_table`). 2023–2025:
+GASTAT's own denominator recovered from its published rate (`gastat_rate_implied`):
+2023 = deaths × 100 000 / mortality rate (2023 sheet 35); 2024 and 2025 = serious accidents × 100 000 / serious-accident
+rate (2024 sheet 5-4, 2025 sheet 5-7). Rounded to integers; arithmetic on official numbers, no projection. Check: the
+2024 and 2025 mortality rates (not used to build them) are reproduced within 0.035 %. Examples: Riyadh 2023 9 085 342,
+2024 9 541 926, 2025 10 090 438; Makkah 2025 9 180 888; Al-Baha 2025 374 010. Caveat: the 2025 workbook revises the 2024
+rates (e.g. Riyadh mortality 9.99 → 9.49); each year uses its own publication.
+
+## 5. Lineage (Gold column → Silver / prep → Bronze → raw)
 
 | Gold columns | Silver / prep | Bronze | Raw files |
 |---|---|---|---|
-| `wx_*`, `temp_*`, `wind_max_ms`, `rain_mm`, `share_*_hours`, `*_days` | `weather_obs` → `prep.weather_station_hour` / `_day` → `prep.saudi_region_month` | `noaa_hourly` (13 SA stations) | `noaa_global_hourly/<year>/<station>.csv` |
-| `acc_year_*`, `acc_share_outside_cities` | `accidents_region_year` (via `gastat_sheet_map`, `region_alias`) | `gastat_cells` | `gastat/*.xlsx` (sheets 17, 20 / 34, 37 / 5-1, 5-5 / 5-1-1, 5-6-1) |
-| `population`, `population_basis`, `acc_*_per_100k` | `population_region_year` + `accidents_region_year` | `gastat_population`, `gastat_cells` | `gastat_population/*.csv` |
-| `road_km_per_1000_people`, `road_km_per_km2`, `intercity_road_km`, `intercity_divided_share` | `roads_region_year` (via `gastat_sheet_map`) | `gastat_cells` | `gastat/*.xlsx` (sheets 12 / 20 / 7-5 / 7-2 and 7 / 15 / 7-2 / 7-1-2) |
-| `av_rr_crash_*`, `av_crash_risk_index` | `nhtsa_crash` + US station hours → `prep.av_relative_risk` | `nhtsa_sgo_ads`, `noaa_hourly` (4 US stations) | `nhtsa_sgo/*.csv`, `noaa_global_hourly/...` |
-| `av_rr_diseng_*`, `av_diseng_risk_index` | `dmv_disengagement` + `dmv_mileage_monthly` + CA day types → `prep.av_relative_risk` | `dmv_disengagements`, `dmv_mileage`, `noaa_hourly` | `ca_dmv_disengagements/*.csv`, `ca_dmv_mileage/*.csv` |
+| `wx_*`, `temp_*`, `wind_max_ms`, `mean_dew_spread_c`, `share_*_hours`, `*_days` | `weather_obs` → `prep.weather_station_hour` → `_day` (fn_day_type) → `prep.saudi_region_month` | `noaa_hourly` (13 SA stations) | `noaa_global_hourly/<year>/<station>.csv` |
+| `traffic_*` | `traffic_region_month` (via `gastat_traffic_map`, `region_alias`) | `gastat_cells` | `gastat/*.xlsx` sheets 14 / 29 / 3-5 / 3-3-1 |
+| `acc_year_*`, `acc_share_outside_cities` | `accidents_region_year` (via `gastat_sheet_map`) | `gastat_cells` | sheets 17, 20 / 34, 37 / 5-1, 5-5 / 5-1-1, 5-6-1 |
+| `population`, `population_basis`, `acc_*_per_100k` | `population_region_year` + `accidents_region_year` | `gastat_population`, `gastat_cells` | `gastat_population/*.csv`; rate sheets 35 / 5-4 / 5-7 (and 5-2 cross-check) |
+| `road_*`, `intercity_*` | `roads_region_year` | `gastat_cells` | sheets 12 / 20 / 7-5 / 7-2 and 7 / 15 / 7-2 / 7-1-2 |
+| `response_*`, `registered_vehicles_2025` | `region_service_2025` | `gastat_cells` | 2025 sheets 5-11, 4-1-2 |
+| `av_crash_multiplier`, `env_readiness*` | `nhtsa_crash` + US station-hours → `prep.av_relative_risk` (NHTSA rows) | `nhtsa_sgo_ads`, `noaa_hourly` (US) | `nhtsa_sgo/*.csv` |
+| evidence behind the weights (DMV rows of `prep.av_relative_risk`) | `dmv_disengagement` + `dmv_mileage_monthly` + CA day types | `dmv_disengagements`, `dmv_mileage`, `noaa_hourly` | `ca_dmv_*/*.csv` |
+| `av_uncovered_share*` | `prep.saudi_region_month` + `dim_condition.us_av_coverage` | `noaa_hourly` | — |
 | `region_*`, `weather_station_id` | `dim_region`, `dim_station` | — | reference data in `02_silver.sql` |
 
 `sql/quality/03_gold_checks.sql` fails if any source family does not reach Gold.
 
-## 6. Data shares (reference build, 27 Nov 2026)
+## 6. Data shares (run of 28 Nov 2026)
 
-Real vs generated: **100 % real, 0 % generated.**
+**View 1 — real vs generated:** 1 086 572 records, **100 % real, 0 % generated / imputed / projected.**
 
-**By records feeding Gold (Silver rows):**
+**View 2 — records per source family (what feeds Gold):**
 
 | Family | Records | Share |
 |---|---:|---:|
-| Weather – Saudi stations (reports) | 695 617 | 64.10 % |
-| Weather – US analog stations (reports) | 224 510 | 20.69 % |
-| Accidents – GASTAT region-year values | 247 | 0.02 % |
-| Roads – GASTAT region-year values | 312 | 0.03 % |
-| Population – census region-year values | 169 | 0.02 % |
+| Weather – Saudi stations (reports) | 695 617 | 64.02 % |
+| Weather – US analog stations (reports) | 224 510 | 20.66 % |
+| AV – DMV mileage (vehicle-months) | 113 900 | 10.48 % |
 | AV – DMV disengagements | 49 066 | 4.52 % |
-| AV – DMV mileage (vehicle-months) | 113 900 | 10.49 % |
 | AV – NHTSA crashes (CA/AZ/TX) | 1 893 | 0.17 % |
+| Traffic – GASTAT region-month values | 780 | 0.07 % |
+| Roads – GASTAT region-year values | 312 | 0.03 % |
+| Accidents – GASTAT region-year values | 247 | 0.02 % |
+| Population – GASTAT region-year values | 208 | 0.02 % |
+| Region service – GASTAT 2025 values | 39 | 0.00 % |
 
-Weather 84.8 %, Saudi accidents + roads + population 0.07 %, AV 15.2 %. Saudi 64.1 %, foreign 35.9 %.
-By records, accidents look tiny because GASTAT publishes totals: the 247 values describe **86 734 serious accidents and
-22 360 deaths**.
+GASTAT publishes totals, so accidents look tiny by records: the 247 values describe **86 734 serious accidents and
+22 360 deaths** (2021–2025).
 
-**By Gold columns (data columns only, 46):** weather 23 (50.0 %), accidents 9 (19.6 %), population 1 (2.2 %),
-roads 4 (8.7 %), AV 9 (19.6 %). Saudi accident context (accidents + population + roads) 14 (30.4 %).
+**View 3 — Gold data columns that vary (49 numeric columns, complete months):** weather 25 (51.0 %), accidents 9
+(18.4 %), AV evidence 5 (10.2 %), roads 4 (8.2 %), region service 3 (6.1 %), traffic 2 (4.1 %), population 1 (2.0 %).
+No Gold column is constant (checked).
 
-## 7. Relative risks found (reference build)
+## 7. AV evidence found (run of 28 Nov 2026)
 
-| Source | Condition | Events | Relative risk | Used |
-|---|---|---:|---:|---|
-| NHTSA crashes | rain | 70 | 1.40 | yes |
-| NHTSA crashes | fog / haze | 2 | 0.02 | no (< 30 events) |
-| NHTSA crashes | dust | 0 | — | no (< 30 events) |
-| NHTSA crashes | night | 741 | 0.64 | stored only |
-| DMV disengagements | rain days | 5 096 | 0.79 | yes |
-| DMV disengagements | fog / haze days | 17 968 | 1.34 | yes |
-| DMV disengagements | dust days | 0 | — | no (no dust days in the California data) |
+| Source | Condition | Events | Crude | Adjusted (MH) | 95 % CI | Used |
+|---|---|---:|---:|---:|---|---|
+| NHTSA crashes | rain | 70 | 1.40 | **1.52** | [1.14, 2.00] | **yes** |
+| NHTSA crashes | obscured_unspecified | 2 | 0.02 | 0.02 | [0.006, 0.10] | no — implausible protective, artefact |
+| NHTSA crashes | dust | 0 | — | — | — | no — no events, uncovered |
+| NHTSA crashes | night (light) | 741 | 0.64 | 0.64 | [0.57, 0.71] | no — exposure is darkness hours, not AV miles |
+| DMV disengagements | rain days | 4 916 | 0.78 | 1.04 | [0.95, 1.15] | no — no detectable penalty |
+| DMV disengagements | fog_moist days | 12 093 | 1.21 | 0.97 | [0.91, 1.04] | no — no detectable penalty |
+| DMV disengagements | haze_dry days | 5 954 | 1.65 | 1.13 | [1.03, 1.23] | no — take-over signal, reported, not a crash weight |
+| DMV disengagements | dust days | 0 | — | — | — | no — no dust days in California |
+
+The crude DMV ratios (fog/haze 1.35 combined, rain 0.78) were confounding: with month and weekday strata they move to
+≈ 1. NB GLM with month + day-of-week fixed effects: rain 0.94 [0.82, 1.09], fog_moist 0.87 [0.77, 0.98], haze_dry 1.06
+[0.90, 1.23]. Forest plot: `docs/figures/rr_crude_vs_adjusted.png`.
 
 ## 8. Limitations (to state in the paper)
 
-1. **Dust in the AV data.** Saudi dust exposure is measured (e.g. Najran 7.8 % of hours, Riyadh 6.5 %, Aseer 1.1 %),
-   but the US AV data has no dust events (0 in-scope NHTSA crashes, 0 California dust days). Dust is kept as its own
-   condition: its exposure is in `share_dust_hours` / `dust_type_days`, and its AV risk is neutral (1) because it
-   cannot be estimated, rather than borrowing the fog risk.
-2. **Exposure is weather, not AV driving.** Fleets avoid some conditions (and drive less at night), which biases those
-   ratios down (e.g. DMV rain 0.81, crash night 0.64).
-3. **DMV location.** Disengagement reports have no place; California weather is taken from LAX + SFO.
-4. **Accidents are annual.** The 12 months of a year carry the same accident values: they are not additive over months
-   (aggregate with MAX or one row per region-year). The weather–accident comparison is done at region × year (65 rows).
-5. **Population after 2022.** The census table ends in 2022; 2023–2025 rates use the 2022 count (`population_basis`),
-   so they are 7–17 % higher than GASTAT's published rates. **Roads** start in 2022 (no 2021 road tables).
-6. **2025 weather** ends in August 2025 in the NOAA mirror used (52 region-months without weather).
-7. **Within/outside cities** split of serious accidents exists for 2024–2025 only.
-8. Association, not causation.
+1. **Dust is uncovered.** Saudi dust exposure is measured (3.49 % of hours; Najran 7.8 %, Riyadh 6.3 %), but the US AV
+   data has no dust events (0 NHTSA crashes, 0 California dust days). It gets weight 0 in `env_readiness`, i.e. it is
+   treated as outside the evidence, not as a measured risk.
+2. **Saudi dry haze ≠ California smoke.** Both are `haze_dry` by the dew-point rule; the conservative variant
+   (`env_readiness_cons`) gives Saudi dry haze weight 0.
+3. **DMV has no location**; California weather is taken as the worse of LAX and SFO.
+4. **NHTSA has month-level dates**, and its exposure is station-hours of the state, not AV miles. 17 of the 70 rain
+   crashes fall in state-months where the reference station logged no rain hour (the station is not the crash place):
+   MH keeps them (1.52), a Poisson GLM drops them (1.48).
+5. **Accidents are annual.** Monthly rows repeat them: aggregate with MAX / one row per region-year (65 rows).
+6. **Heat** is covered by Phoenix operations (7.5 % of hours ≥ 40 °C) but there is no event-level heat evidence.
+7. **2024 rate revision** in the 2025 workbook; each year uses its own publication.
+8. **Weather 2025** ends on 25 Aug 2025 (Aug 2025 below 80 % coverage; Sep–Dec 2025 without weather: 65 region-months
+   excluded by `wx_complete`).
+9. **One station per region** (the main airport). **Roads** start in 2022; the within/outside-city split starts in 2024.
+   **Traffic** count stations can be added, moved or removed during a year (GASTAT's own note), so traffic levels are
+   compared within a region-year through `traffic_month_index`, not across years.
+10. **Association, not causation.** Weather → accidents at region-year level is a null result with this data
+    (report 04).
 
-## 9. Expected counts after a run (from `python/02_reference_gold.py`)
+## 9. Expected counts after a run (`python/02_reference_gold.py`, equal to the SQL run)
 
 | Table | Rows |
 |---|---:|
@@ -231,11 +256,16 @@ roads 4 (8.7 %), AV 9 (19.6 %). Saudi accident context (accidents + population +
 | silver.weather_obs | 920 127 |
 | silver.accidents_region_year | 65 |
 | silver.roads_region_year | 52 |
-| silver.population_region_year | 169 |
+| silver.population_region_year | 208 |
+| silver.traffic_region_month | 780 |
+| silver.region_service_2025 | 13 |
 | silver.dmv_disengagement | 49 066 |
 | silver.dmv_mileage_monthly | 113 900 |
-| silver.nhtsa_crash | 3 244 |
+| silver.nhtsa_crash | 3 244 (1 893 in scope) |
+| prep.weather_station_hour | 682 398 |
+| prep.weather_station_day | 28 744 |
+| prep.av_relative_risk | 11 |
 | gold.av_readiness_region_month | 780 |
 
-Small differences against the SQL run can come from time-zone handling inside daylight-saving changes; the Gold
-row count, accident values and relative-risk levels should match.
+The pipeline exports Gold to `Data/gold_export/` and compares it with the reference column by column
+(`python/02_reference_gold.py --compare`): 780 rows, 64 columns, PASS on 28 Nov 2026.

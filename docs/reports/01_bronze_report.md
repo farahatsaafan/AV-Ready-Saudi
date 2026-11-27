@@ -3,6 +3,9 @@
 Run: 27 Nov 2026, SQL Server 2022 (Docker, macOS), database `av_ready_saudi_dw`, script `sql/01_bronze.sql`,
 procedure `bronze.load_bronze`. All numbers below are from that run (`Data/pipeline_run.log`).
 
+Bronze is unchanged in design v2 (28 Nov 2026): the new Silver inputs (dew point `DEW`, monthly traffic, GASTAT rate
+sheets, region service) were already in `bronze.noaa_hourly` and `bronze.gastat_cells`; no file or column was added.
+
 ## 1. Purpose
 
 Bronze is the raw landing zone (Lecture 02 §2.2): every value is stored exactly as the source published it, as text,

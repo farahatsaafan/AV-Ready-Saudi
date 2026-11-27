@@ -92,6 +92,12 @@ Silver,silver.dim_region,region_name_en,NVARCHAR(50),NO,,"region name, English"
 Silver,silver.dim_region,region_name_ar,NVARCHAR(50),NO,,"region name, Arabic"
 Silver,silver.region_alias,alias_key,NVARCHAR(60),NO,PK,"normalised region label (lower case, no spaces/hyphens/""region""/""province"")"
 Silver,silver.region_alias,region_code,CHAR(3),NO,FK,Saudi administrative region code (3 letters)
+Silver,silver.dim_condition,condition_code,VARCHAR(25),NO,PK,"condition key of vocabulary v2: dust, haze_dry, fog_moist, rain, normal (hour buckets), obscured_unspecified, unknown (NHTSA only), day, night (light)"
+Silver,silver.dim_condition,factor,VARCHAR(10),NO,,weather / light
+Silver,silver.dim_condition,priority,TINYINT,YES,,"hour-bucket priority, 1 wins (dust > haze_dry > fog_moist > rain > normal); NULL = not an hour bucket"
+Silver,silver.dim_condition,label,NVARCHAR(80),NO,,readable name of the condition
+Silver,silver.dim_condition,rule_text,NVARCHAR(400),NO,,"the exact WMO 4677 / 4680 / METAR (AU1) code rule, visibility and dew-point rule that defines the condition"
+Silver,silver.dim_condition,us_av_coverage,VARCHAR(30),NO,,"uncovered (no US AV evidence: dust), covered, reference, nhtsa_category, excluded"
 Silver,silver.dim_station,station_id,CHAR(11),NO,PK,NOAA station id
 Silver,silver.dim_station,station_name,NVARCHAR(80),NO,,station name
 Silver,silver.dim_station,country,CHAR(2),NO,,SA or US
@@ -102,11 +108,19 @@ Silver,silver.dim_station,latitude,FLOAT,NO,,latitude
 Silver,silver.dim_station,longitude,FLOAT,NO,,longitude
 Silver,silver.gastat_sheet_map,file_key,NVARCHAR(80),NO,,part of the workbook file name
 Silver,silver.gastat_sheet_map,sheet_name,NVARCHAR(20),NO,,worksheet name
-Silver,silver.gastat_sheet_map,metric,VARCHAR(30),NO,PK,serious / serious_within / serious_outside / deaths / injuries
+Silver,silver.gastat_sheet_map,metric,VARCHAR(30),NO,PK,"what the cells hold: accident metrics, road metrics, official rates per 100k, region service metrics, traffic_monthly"
 Silver,silver.gastat_sheet_map,data_year,SMALLINT,NO,PK,year the value refers to
 Silver,silver.gastat_sheet_map,col_num,INT,NO,,Excel column that holds the value
 Silver,silver.gastat_sheet_map,first_row,INT,NO,,first data row
 Silver,silver.gastat_sheet_map,last_row,INT,NO,,last data row
+Silver,silver.gastat_traffic_map,data_year,SMALLINT,NO,PK,year the traffic block describes (2021-2025)
+Silver,silver.gastat_traffic_map,file_key,NVARCHAR(80),NO,,GASTAT workbook (matched with LIKE)
+Silver,silver.gastat_traffic_map,sheet_name,NVARCHAR(20),NO,,sheet of the monthly traffic table
+Silver,silver.gastat_traffic_map,layout,VARCHAR(20),NO,,"car_truck_pairs (2021, 2022: region per column pair, months on rows) / region_rows (2023-2025: region per row, months on columns)"
+Silver,silver.gastat_traffic_map,header_row,INT,NO,,row holding the region names (car_truck_pairs) or the month names (region_rows)
+Silver,silver.gastat_traffic_map,first_row,INT,NO,,first data row (January for car_truck_pairs; first region for region_rows)
+Silver,silver.gastat_traffic_map,last_row,INT,NO,,last data row
+Silver,silver.gastat_traffic_map,definition,VARCHAR(40),NO,,avg_daily_per_count_point / total_div_points_days
 Silver,silver.reject_log,reject_id,BIGINT,NO,PK,surrogate key
 Silver,silver.reject_log,source_table,VARCHAR(60),NO,,Silver table the row was meant for
 Silver,silver.reject_log,source_file,NVARCHAR(400),YES,,raw file the row came from (path under Data/raw)
@@ -120,6 +134,8 @@ Silver,silver.weather_obs,obs_local,DATETIME2(0),NO,,"observation time, station 
 Silver,silver.weather_obs,report_type,VARCHAR(10),NO,PK,report type (trimmed)
 Silver,silver.weather_obs,vis_m,INT,YES,,visibility in metres (NULL if missing or suspect)
 Silver,silver.weather_obs,temp_c,"DECIMAL(5,1)",YES,,air temperature degC
+Silver,silver.weather_obs,dew_c,"DECIMAL(5,1)",YES,,"dew point in degC, parsed from DEW exactly like TMP (+9999 = missing; quality 2/3/6/7 -> NULL)"
+Silver,silver.weather_obs,dew_spread_c,"DECIMAL(5,1)",YES,,temp_c - dew_c (small = moist air: fog / mist; large = dry air: dust haze)
 Silver,silver.weather_obs,wind_ms,"DECIMAL(5,1)",YES,,wind speed m/s
 Silver,silver.weather_obs,precip_1h_mm,"DECIMAL(6,1)",YES,,1-hour precipitation mm
 Silver,silver.weather_obs,mw_code,CHAR(2),YES,,manual present-weather code (WMO 4677)
@@ -134,6 +150,8 @@ Silver,silver.weather_obs,is_fog,BIT,NO,,fog reported
 Silver,silver.weather_obs,is_rain,BIT,NO,,rain/precipitation reported or measured
 Silver,silver.weather_obs,is_low_vis,BIT,NO,,visibility < 5 km
 Silver,silver.weather_obs,is_night,BIT,NO,,sun below the horizon (elevation < -0.833 deg)
+Silver,silver.weather_obs,is_hot40,BIT,NO,,temp_c >= 40 degC
+Silver,silver.weather_obs,is_hot45,BIT,NO,,temp_c >= 45 degC
 Silver,silver.weather_obs,source_file,NVARCHAR(400),NO,,raw file the row came from (path under Data/raw)
 Silver,silver.weather_obs,source_row_num,INT,NO,,line number in the raw file
 Silver,silver.weather_obs,dw_create_date,DATETIME2,NO,,time the Silver row was written
@@ -160,11 +178,31 @@ Silver,silver.roads_region_year,source_files,NVARCHAR(400),YES,,GASTAT workbook(
 Silver,silver.roads_region_year,dw_create_date,DATETIME2,NO,,Silver load time
 Silver,silver.population_region_year,region_code,CHAR(3),NO,PK,Saudi administrative region (silver.dim_region)
 Silver,silver.population_region_year,data_year,SMALLINT,NO,PK,converted from Arabic-Indic digits
-Silver,silver.population_region_year,population,INT,NO,,"all nationalities, both genders"
-Silver,silver.population_region_year,population_saudi,INT,NO,,Saudi nationals (both genders)
-Silver,silver.population_region_year,population_non_saudi,INT,NO,,non-Saudi residents (both genders)
+Silver,silver.population_region_year,population,INT,NO,,"all nationalities, both genders: census table count (2010-2022) or GASTAT's own denominator recovered from its published rate (2023-2025)"
+Silver,silver.population_region_year,population_saudi,INT,YES,,Saudi nationals (census rows only; NULL for rate-implied rows)
+Silver,silver.population_region_year,population_non_saudi,INT,YES,,non-Saudi residents (census rows only; NULL for rate-implied rows)
+Silver,silver.population_region_year,population_basis,VARCHAR(30),NO,,census_2022_table (2010-2022) / gastat_rate_implied (2023-2025)
+Silver,silver.population_region_year,basis_detail,NVARCHAR(200),NO,,"how the number was obtained, e.g. serious x 100000 / official_serious_per_100k (workbook, sheet)"
 Silver,silver.population_region_year,source_file,NVARCHAR(400),NO,,census CSV the values were read from
 Silver,silver.population_region_year,dw_create_date,DATETIME2,NO,,Silver load time
+Silver,silver.traffic_region_month,region_code,CHAR(3),NO,PK,administrative region (FK silver.dim_region)
+Silver,silver.traffic_region_month,month_start,DATE,NO,PK,first day of the month
+Silver,silver.traffic_region_month,data_year,SMALLINT,NO,,calendar year
+Silver,silver.traffic_region_month,month_num,TINYINT,NO,,1-12
+Silver,silver.traffic_region_month,adt_per_point,"DECIMAL(12,1)",NO,,average daily intercity vehicles per count point: Car + Truck (2021-2022) or month total / count points / days (2023-2025)
+Silver,silver.traffic_region_month,total_vehicles,"DECIMAL(14,1)",YES,,month total over the region's count points (2023-2025; NULL for 2021-2022)
+Silver,silver.traffic_region_month,count_points,INT,YES,,number of traffic count points in the region (2023-2025)
+Silver,silver.traffic_region_month,definition,VARCHAR(40),NO,,avg_daily_per_count_point (2021-2022) / total_div_points_days (2023-2025)
+Silver,silver.traffic_region_month,traffic_month_index,"DECIMAL(6,3)",NO,,adt_per_point / mean of the region's 12 months of that year (comparable across the two definitions)
+Silver,silver.traffic_region_month,source_file,NVARCHAR(400),NO,,GASTAT workbook
+Silver,silver.traffic_region_month,source_sheet,NVARCHAR(20),NO,,sheet of the workbook
+Silver,silver.traffic_region_month,dw_create_date,DATETIME2,NO,,load timestamp
+Silver,silver.region_service_2025,region_code,CHAR(3),NO,PK,administrative region (FK silver.dim_region)
+Silver,silver.region_service_2025,response_within_s,INT,NO,,"average ambulance response time within cities, seconds (GASTAT 2025, sheet 5-11, MM:SS)"
+Silver,silver.region_service_2025,response_outside_s,INT,NO,,"average ambulance response time outside cities, seconds (GASTAT 2025, sheet 5-11)"
+Silver,silver.region_service_2025,registered_vehicles,BIGINT,NO,,vehicles registered in the region (GASTAT 2025 sheet 4-1-2)
+Silver,silver.region_service_2025,source_file,NVARCHAR(400),NO,,GASTAT workbook
+Silver,silver.region_service_2025,dw_create_date,DATETIME2,NO,,load timestamp
 Silver,silver.dmv_disengagement,disengagement_id,BIGINT,NO,PK,surrogate key
 Silver,silver.dmv_disengagement,report_file,NVARCHAR(400),NO,,DMV report file
 Silver,silver.dmv_disengagement,source_row_num,INT,NO,,line number in the raw file
@@ -205,7 +243,7 @@ Silver,silver.nhtsa_crash,w_fog_smoke_haze,BIT,NO,,weather flag fog/smoke/haze
 Silver,silver.nhtsa_crash,w_dust,BIT,NO,,weather flag dust storm
 Silver,silver.nhtsa_crash,w_wind,BIT,NO,,weather flag severe wind
 Silver,silver.nhtsa_crash,w_unknown,BIT,NO,,weather unknown
-Silver,silver.nhtsa_crash,weather_bucket,VARCHAR(10),NO,,dust (Dust Storm) / fog_haze (Fog/Smoke/Haze) / rain (Rain or Snow) / normal / unknown
+Silver,silver.nhtsa_crash,weather_bucket,VARCHAR(25),NO,FK,"FK silver.dim_condition: dust (Dust Storm) / obscured_unspecified (Fog/Smoke/Haze) / rain (Rain or Snow) / normal (Clear, Cloudy, Partly Cloudy, Severe Wind) / unknown"
 Silver,silver.nhtsa_crash,is_night,BIT,YES,,sun below the horizon (elevation < -0.833 deg)
 Silver,silver.nhtsa_crash,in_scope,BIT,NO,,CA/AZ/TX and incident year 2021-2025
 Silver,silver.nhtsa_crash,dw_create_date,DATETIME2,NO,,time the Silver row was written
@@ -217,60 +255,74 @@ prep (Gold work),prep.weather_station_hour,temp_c,"DECIMAL(5,1)",YES,,air temper
 prep (Gold work),prep.weather_station_hour,temp_max_c,"DECIMAL(5,1)",YES,,max temperature degC
 prep (Gold work),prep.weather_station_hour,wind_max_ms,"DECIMAL(5,1)",YES,,max wind m/s
 prep (Gold work),prep.weather_station_hour,precip_mm,"DECIMAL(6,1)",YES,,precipitation mm
+prep (Gold work),prep.weather_station_hour,dew_spread_c,FLOAT,YES,,mean temperature - dew point of the hour's reports (degC)
+prep (Gold work),prep.weather_station_hour,min_dew_spread_c,"DECIMAL(5,1)",YES,,smallest temperature - dew point in the hour (fog_moist rule: <= 2.5 degC)
 prep (Gold work),prep.weather_station_hour,is_dust,BIT,NO,,dust or sand reported
 prep (Gold work),prep.weather_station_hour,is_haze,BIT,NO,,haze or smoke reported
 prep (Gold work),prep.weather_station_hour,is_fog,BIT,NO,,fog reported
 prep (Gold work),prep.weather_station_hour,is_low_vis,BIT,NO,,visibility < 5 km
 prep (Gold work),prep.weather_station_hour,is_obscured,BIT,NO,,dust OR haze OR fog OR visibility < 5 km
-prep (Gold work),prep.weather_station_hour,is_fog_haze,BIT,NO,,"obscured hour WITHOUT any dust report (fog, haze/smoke, mist, low visibility)"
-prep (Gold work),prep.weather_station_hour,is_rain,BIT,NO,,rain/precipitation reported or measured
+prep (Gold work),prep.weather_station_hour,is_fog_moist,BIT,NO,,"obscured, no dust, and a fog code or min spread <= 2.5 degC"
+prep (Gold work),prep.weather_station_hour,is_haze_dry,BIT,NO,,"obscured, no dust, not fog_moist"
+prep (Gold work),prep.weather_station_hour,is_rain,BIT,NO,,precipitation reported in the hour (raw flag; the hour is a rain hour only if not obscured)
 prep (Gold work),prep.weather_station_hour,is_night,BIT,NO,,sun below the horizon (elevation < -0.833 deg)
-prep (Gold work),prep.weather_station_hour,hour_bucket,VARCHAR(10),NO,,dust > fog_haze > rain > normal
+prep (Gold work),prep.weather_station_hour,is_hot40,BIT,NO,,a report >= 40 degC in the hour
+prep (Gold work),prep.weather_station_hour,is_hot45,BIT,NO,,a report >= 45 degC in the hour
+prep (Gold work),prep.weather_station_hour,hour_bucket,VARCHAR(25),NO,FK,FK silver.dim_condition; priority dust > haze_dry > fog_moist > rain > normal
 prep (Gold work),prep.weather_station_day,station_id,CHAR(11),NO,PK,NOAA station id
 prep (Gold work),prep.weather_station_day,local_date,DATE,NO,PK,local date
 prep (Gold work),prep.weather_station_day,hours_observed,INT,NO,,hours with at least one report
-prep (Gold work),prep.weather_station_day,dust_hours,INT,NO,,hours with dust
-prep (Gold work),prep.weather_station_day,fog_haze_hours,INT,NO,,hours that were obscured without any dust report (fog / haze / mist / low visibility)
+prep (Gold work),prep.weather_station_day,dust_hours,INT,NO,,hours whose bucket is dust
+prep (Gold work),prep.weather_station_day,haze_dry_hours,INT,NO,,hours whose bucket is haze_dry
+prep (Gold work),prep.weather_station_day,fog_moist_hours,INT,NO,,hours whose bucket is fog_moist
+prep (Gold work),prep.weather_station_day,rain_hours,INT,NO,,hours whose bucket is rain (precipitation and not obscured)
+prep (Gold work),prep.weather_station_day,normal_hours,INT,NO,,hours whose bucket is normal
 prep (Gold work),prep.weather_station_day,obscured_hours,INT,NO,,hours with dust OR haze OR fog OR visibility < 5 km
-prep (Gold work),prep.weather_station_day,rain_hours,INT,NO,,rain hours
-prep (Gold work),prep.weather_station_day,day_type,VARCHAR(10),NO,,">= 3 obscured hours: dust or fog_haze (whichever has more hours, ties -> dust); else rain (>= 1 rain hour); else normal"
+prep (Gold work),prep.weather_station_day,day_type,VARCHAR(25),NO,FK,FK silver.dim_condition; silver.fn_day_type: >= 3 obscured hours -> the largest of dust / haze_dry / fog_moist (ties in that order); else rain (>= 1 rain hour); else normal
 prep (Gold work),prep.saudi_region_month,region_code,CHAR(3),NO,PK,Saudi administrative region code (3 letters)
-prep (Gold work),prep.saudi_region_month,station_id,CHAR(11),NO,,NOAA station id
+prep (Gold work),prep.saudi_region_month,station_id,CHAR(11),NO,FK,NOAA station id
 prep (Gold work),prep.saudi_region_month,month_start,DATE,NO,PK,first day of the month
 prep (Gold work),prep.saudi_region_month,hours_observed,INT,YES,,hours with at least one report
 prep (Gold work),prep.saudi_region_month,temp_mean_c,"DECIMAL(5,1)",YES,,mean of hourly temperatures degC
 prep (Gold work),prep.saudi_region_month,temp_max_c,"DECIMAL(5,1)",YES,,max temperature degC
 prep (Gold work),prep.saudi_region_month,wind_max_ms,"DECIMAL(5,1)",YES,,max wind m/s
-prep (Gold work),prep.saudi_region_month,rain_mm,"DECIMAL(8,1)",YES,,sum of 1-hour precipitation mm
-prep (Gold work),prep.saudi_region_month,dust_hours,INT,YES,,hours with dust
+prep (Gold work),prep.saudi_region_month,mean_dew_spread_c,FLOAT,YES,,mean temperature - dew point over the month's hours
+prep (Gold work),prep.saudi_region_month,dust_hours,INT,YES,,hours with bucket dust
+prep (Gold work),prep.saudi_region_month,haze_dry_hours,INT,YES,,hours with bucket haze_dry
+prep (Gold work),prep.saudi_region_month,fog_moist_hours,INT,YES,,hours with bucket fog_moist
+prep (Gold work),prep.saudi_region_month,rain_hours,INT,YES,,hours with bucket rain
+prep (Gold work),prep.saudi_region_month,normal_hours,INT,YES,,hours with bucket normal
 prep (Gold work),prep.saudi_region_month,haze_hours,INT,YES,,hours with haze
 prep (Gold work),prep.saudi_region_month,fog_hours,INT,YES,,hours with fog
 prep (Gold work),prep.saudi_region_month,low_vis_hours,INT,YES,,hours with visibility < 5 km
-prep (Gold work),prep.saudi_region_month,obscured_hours,INT,YES,,hours with dust OR haze OR fog OR visibility < 5 km
-prep (Gold work),prep.saudi_region_month,fog_haze_hours,INT,YES,,obscured hours without dust in the month
-prep (Gold work),prep.saudi_region_month,rain_hours,INT,YES,,rain hours
-prep (Gold work),prep.saudi_region_month,normal_hours,INT,YES,,normal hours
 prep (Gold work),prep.saudi_region_month,night_hours,INT,YES,,night hours
+prep (Gold work),prep.saudi_region_month,hot40_hours,INT,YES,,hours with a report >= 40 degC
+prep (Gold work),prep.saudi_region_month,hot45_hours,INT,YES,,hours with a report >= 45 degC
 prep (Gold work),prep.saudi_region_month,days_observed,INT,YES,,days with data
 prep (Gold work),prep.saudi_region_month,dust_days,INT,YES,,days with any dust hour
-prep (Gold work),prep.saudi_region_month,dust_type_days,INT,YES,,days whose day type is dust
-prep (Gold work),prep.saudi_region_month,fog_haze_days,INT,YES,,days whose day type is fog_haze
-prep (Gold work),prep.saudi_region_month,obscured_days,INT,YES,,dust_type_days + fog_haze_days
+prep (Gold work),prep.saudi_region_month,dust_type_days,INT,YES,,days of day type dust
+prep (Gold work),prep.saudi_region_month,haze_dry_days,INT,YES,,days of day type haze_dry
+prep (Gold work),prep.saudi_region_month,fog_moist_days,INT,YES,,days of day type fog_moist
 prep (Gold work),prep.saudi_region_month,rain_days,INT,YES,,rain days
 prep (Gold work),prep.saudi_region_month,normal_days,INT,YES,,normal days
 prep (Gold work),prep.av_relative_risk,event_source,VARCHAR(20),NO,PK,nhtsa_crash / dmv_disengagement
 prep (Gold work),prep.av_relative_risk,factor,VARCHAR(10),NO,PK,weather / light
-prep (Gold work),prep.av_relative_risk,level,VARCHAR(10),NO,PK,"weather: normal, rain, fog_haze, dust / light: day, night"
-prep (Gold work),prep.av_relative_risk,events,INT,NO,,events in the level
-prep (Gold work),prep.av_relative_risk,event_share,FLOAT,YES,,share of events
-prep (Gold work),prep.av_relative_risk,exposure,FLOAT,YES,,fleet miles on those days (disengagements)
-prep (Gold work),prep.av_relative_risk,exposure_share,FLOAT,YES,,share of exposure
-prep (Gold work),prep.av_relative_risk,relative_risk,FLOAT,YES,,(event share / exposure share) / same for reference level
-prep (Gold work),prep.av_relative_risk,used_in_index,BIT,YES,,1 if events >= 30
+prep (Gold work),prep.av_relative_risk,condition_code,VARCHAR(25),NO,PK,FK silver.dim_condition: the level compared with the reference (normal / day)
+prep (Gold work),prep.av_relative_risk,events,INT,NO,,AV events in the analysed strata at this level
+prep (Gold work),prep.av_relative_risk,exposure,FLOAT,YES,,station-hours of the state (NHTSA) or DMV fleet miles (DMV) at this level in the analysed strata
+prep (Gold work),prep.av_relative_risk,rr_crude,FLOAT,YES,,pooled ratio without strata (NHTSA: event share / state-weighted exposure share; DMV: events per mile / normal)
+prep (Gold work),prep.av_relative_risk,rr_adjusted,FLOAT,YES,,Mantel-Haenszel rate ratio over the strata (reference level = 1)
+prep (Gold work),prep.av_relative_risk,ci_low,FLOAT,YES,,"95 % CI lower bound: Greenland-Robins variance x max(1, dispersion)"
+prep (Gold work),prep.av_relative_risk,ci_high,FLOAT,YES,,95 % CI upper bound
+prep (Gold work),prep.av_relative_risk,n_strata,INT,NO,,number of strata (NHTSA: state x month with >= 1 crash; DMV: month x weekday class)
+prep (Gold work),prep.av_relative_risk,dispersion,FLOAT,YES,,Pearson chi2 / df of the fitted stratified model (overdispersion factor)
+prep (Gold work),prep.av_relative_risk,adjustment,VARCHAR(40),NO,,how the ratio is stratified
+prep (Gold work),prep.av_relative_risk,used_in_index,BIT,NO,,1 = applied in Gold: AV crash ratio with >= 30 events and CI lower bound > 1
+prep (Gold work),prep.av_relative_risk,evidence_note,VARCHAR(120),NO,,"why it is used or not (significant penalty - used / no detectable penalty / implausible protective - artefact / no events - uncovered / takeover signal - reported, not a crash weight)"
 Gold,gold.av_readiness_region_month,region_code,CHAR(3),NO,PK,Saudi administrative region code (3 letters)
 Gold,gold.av_readiness_region_month,region_name_en,NVARCHAR(50),NO,,"region name, English"
 Gold,gold.av_readiness_region_month,region_name_ar,NVARCHAR(50),NO,,"region name, Arabic"
-Gold,gold.av_readiness_region_month,weather_station_id,CHAR(11),NO,,NOAA station that represents the region
+Gold,gold.av_readiness_region_month,weather_station_id,CHAR(11),NO,FK,NOAA station that represents the region
 Gold,gold.av_readiness_region_month,year,SMALLINT,NO,,calendar year
 Gold,gold.av_readiness_region_month,month,TINYINT,NO,,calendar month
 Gold,gold.av_readiness_region_month,month_start,DATE,NO,PK,first day of the month
@@ -278,52 +330,58 @@ Gold,gold.av_readiness_region_month,season,VARCHAR(6),NO,,winter (DJF) / spring 
 Gold,gold.av_readiness_region_month,wx_hours_observed,INT,YES,,hours of the month with weather data
 Gold,gold.av_readiness_region_month,wx_hours_in_month,INT,NO,,hours in the month
 Gold,gold.av_readiness_region_month,wx_coverage_pct,"DECIMAL(5,1)",YES,,observed / total hours %
+Gold,gold.av_readiness_region_month,wx_complete,BIT,NO,,1 = weather present and coverage >= 80 % (filter for every weather analysis)
 Gold,gold.av_readiness_region_month,temp_mean_c,"DECIMAL(5,1)",YES,,mean of hourly temperatures degC
 Gold,gold.av_readiness_region_month,temp_max_c,"DECIMAL(5,1)",YES,,max temperature degC
 Gold,gold.av_readiness_region_month,wind_max_ms,"DECIMAL(5,1)",YES,,max wind m/s
-Gold,gold.av_readiness_region_month,rain_mm,"DECIMAL(8,1)",YES,,sum of 1-hour precipitation mm
-Gold,gold.av_readiness_region_month,share_dust_hours,"DECIMAL(6,4)",YES,,share of hours with dust
+Gold,gold.av_readiness_region_month,mean_dew_spread_c,"DECIMAL(5,1)",YES,,mean temperature - dew point of the month (small = moist)
+Gold,gold.av_readiness_region_month,share_normal_hours,"DECIMAL(6,4)",YES,,share of hours with bucket normal (the five v2 shares sum to 1)
+Gold,gold.av_readiness_region_month,share_rain_hours,"DECIMAL(6,4)",YES,,share of hours with bucket rain (precipitation and not obscured)
+Gold,gold.av_readiness_region_month,share_fog_moist_hours,"DECIMAL(6,4)",YES,,"share of hours with bucket fog_moist (obscured, no dust, fog code or spread <= 2.5 degC)"
+Gold,gold.av_readiness_region_month,share_haze_dry_hours,"DECIMAL(6,4)",YES,,"share of hours with bucket haze_dry (obscured, no dust, dry air)"
+Gold,gold.av_readiness_region_month,share_dust_hours,"DECIMAL(6,4)",YES,,share of hours with dust or sand reported
 Gold,gold.av_readiness_region_month,share_haze_hours,"DECIMAL(6,4)",YES,,share of hours with haze/smoke
 Gold,gold.av_readiness_region_month,share_fog_hours,"DECIMAL(6,4)",YES,,share of hours with fog
 Gold,gold.av_readiness_region_month,share_low_vis_hours,"DECIMAL(6,4)",YES,,share of hours with visibility < 5 km
-Gold,gold.av_readiness_region_month,share_obscured_hours,"DECIMAL(6,4)",YES,,share of hours with dust OR haze OR fog OR visibility < 5 km (= dust + fog/haze)
-Gold,gold.av_readiness_region_month,share_fog_haze_hours,"DECIMAL(6,4)",YES,,share of hours obscured without any dust report (fog / haze / mist / low visibility)
-Gold,gold.av_readiness_region_month,share_rain_hours,"DECIMAL(6,4)",YES,,share of rain hours (not obscured)
-Gold,gold.av_readiness_region_month,share_normal_hours,"DECIMAL(6,4)",YES,,share of normal hours
 Gold,gold.av_readiness_region_month,share_night_hours,"DECIMAL(6,4)",YES,,share of night hours
+Gold,gold.av_readiness_region_month,share_hot40_hours,"DECIMAL(6,4)",YES,,share of hours with a report >= 40 degC
+Gold,gold.av_readiness_region_month,share_hot45_hours,"DECIMAL(6,4)",YES,,share of hours with a report >= 45 degC
 Gold,gold.av_readiness_region_month,days_observed,INT,YES,,days with data
 Gold,gold.av_readiness_region_month,dust_days,INT,YES,,days with any dust hour
-Gold,gold.av_readiness_region_month,dust_type_days,INT,YES,,day type = dust
-Gold,gold.av_readiness_region_month,fog_haze_days,INT,YES,,day type = fog_haze
-Gold,gold.av_readiness_region_month,obscured_days,INT,YES,,dust_type_days + fog_haze_days
-Gold,gold.av_readiness_region_month,rain_days,INT,YES,,rain days
-Gold,gold.av_readiness_region_month,normal_days,INT,YES,,normal days
+Gold,gold.av_readiness_region_month,dust_type_days,INT,YES,,days of day type dust
+Gold,gold.av_readiness_region_month,haze_dry_days,INT,YES,,days of day type haze_dry
+Gold,gold.av_readiness_region_month,fog_moist_days,INT,YES,,days of day type fog_moist
+Gold,gold.av_readiness_region_month,rain_days,INT,YES,,days of day type rain
+Gold,gold.av_readiness_region_month,normal_days,INT,YES,,days of day type normal
+Gold,gold.av_readiness_region_month,traffic_adt_per_point,"DECIMAL(12,1)",YES,,average daily intercity vehicles per count point (definition in traffic_definition)
+Gold,gold.av_readiness_region_month,traffic_definition,VARCHAR(40),YES,,avg_daily_per_count_point (2021-2022) / total_div_points_days (2023-2025)
+Gold,gold.av_readiness_region_month,traffic_month_index,"DECIMAL(6,3)",YES,,month / mean of the region's 12 months of that year (comparable across years)
 Gold,gold.av_readiness_region_month,acc_year_serious,INT,YES,,serious accidents in the region in that year (GASTAT)
 Gold,gold.av_readiness_region_month,acc_year_deaths,INT,YES,,deaths in the region in that year
 Gold,gold.av_readiness_region_month,acc_year_injuries,INT,YES,,injuries in the region in that year
 Gold,gold.av_readiness_region_month,acc_year_serious_within_cities,INT,YES,,serious accidents within cities (2024-2025)
 Gold,gold.av_readiness_region_month,acc_year_serious_outside_cities,INT,YES,,serious accidents outside cities (2024-2025)
 Gold,gold.av_readiness_region_month,acc_share_outside_cities,"DECIMAL(6,4)",YES,,outside / (within + outside)
-Gold,gold.av_readiness_region_month,population,INT,YES,,"GASTAT Census 2022 table (2021, 2022 observed)"
-Gold,gold.av_readiness_region_month,population_basis,VARCHAR(20),YES,,'census_year' (2021-2022) / 'census_2022' (2023-2025)
-Gold,gold.av_readiness_region_month,acc_serious_per_100k,"DECIMAL(9,2)",YES,,"acc_year_serious / population * 100,000"
+Gold,gold.av_readiness_region_month,population,INT,YES,,population of the same year: census table (2021-2022) / GASTAT's own denominator recovered from its published rate (2023-2025)
+Gold,gold.av_readiness_region_month,population_basis,VARCHAR(30),YES,,census_2022_table (2021-2022) / gastat_rate_implied (2023-2025)
+Gold,gold.av_readiness_region_month,acc_serious_per_100k,"DECIMAL(9,2)",YES,,"acc_year_serious / population x 100,000"
 Gold,gold.av_readiness_region_month,acc_deaths_per_100k,"DECIMAL(9,2)",YES,,acc_year_deaths / population * 100000
 Gold,gold.av_readiness_region_month,acc_injuries_per_100k,"DECIMAL(9,2)",YES,,acc_year_injuries / population * 100000
 Gold,gold.av_readiness_region_month,road_km_per_1000_people,"DECIMAL(9,3)",YES,,whole network / population
 Gold,gold.av_readiness_region_month,road_km_per_km2,"DECIMAL(9,4)",YES,,whole network / area
 Gold,gold.av_readiness_region_month,intercity_road_km,"DECIMAL(10,1)",YES,,total intercity road length of the region in the year (km; NULL for 2021)
 Gold,gold.av_readiness_region_month,intercity_divided_share,"DECIMAL(6,4)",YES,,(highway + dual carriageway) / intercity total
-Gold,gold.av_readiness_region_month,av_rr_crash_rain,"DECIMAL(9,4)",YES,,relative risk of an AV crash in rain (NHTSA)
-Gold,gold.av_readiness_region_month,av_rr_crash_fog_haze,"DECIMAL(9,4)",YES,,"relative risk of an NHTSA ADS crash in fog / haze hours vs normal hours (NULL if < 30 crashes, evidence rule)"
-Gold,gold.av_readiness_region_month,av_rr_crash_dust,"DECIMAL(9,4)",YES,,NULL: too few AV crashes in dust (evidence rule)
-Gold,gold.av_readiness_region_month,av_rr_crash_night,"DECIMAL(9,4)",YES,,"relative risk of an AV crash at night (stored, not in index)"
-Gold,gold.av_readiness_region_month,av_rr_diseng_rain_day,"DECIMAL(9,4)",YES,,relative risk of a disengagement on a rain day (CA DMV)
-Gold,gold.av_readiness_region_month,av_rr_diseng_fog_haze_day,"DECIMAL(9,4)",YES,,relative risk of a DMV disengagement per fleet mile on California fog / haze days vs normal days
-Gold,gold.av_readiness_region_month,av_rr_diseng_dust_day,"DECIMAL(9,4)",YES,,NULL: no dust days in the California AV data
-Gold,gold.av_readiness_region_month,av_crash_risk_index,"DECIMAL(9,4)",YES,,condition mix x crash relative risks (1 = normal only)
-Gold,gold.av_readiness_region_month,av_diseng_risk_index,"DECIMAL(9,4)",YES,,day-type mix x disengagement relative risks (1 = normal only)
+Gold,gold.av_readiness_region_month,response_within_s,INT,YES,,"ambulance response time within cities, seconds (GASTAT 2025; same on every row of the region)"
+Gold,gold.av_readiness_region_month,response_outside_s,INT,YES,,"ambulance response time outside cities, seconds (GASTAT 2025)"
+Gold,gold.av_readiness_region_month,registered_vehicles_2025,BIGINT,YES,,vehicles registered in the region (GASTAT 2025)
+Gold,gold.av_readiness_region_month,av_uncovered_share,"DECIMAL(9,6)",YES,,share of hours without any US AV evidence (dust)
+Gold,gold.av_readiness_region_month,av_uncovered_share_cons,"DECIMAL(9,6)",YES,,conservative uncovered share: dust + dry haze
+Gold,gold.av_readiness_region_month,av_crash_multiplier,"DECIMAL(9,6)",YES,,1 + sum over used conditions of share x (RR - 1); today rain only (NHTSA RR)
+Gold,gold.av_readiness_region_month,env_readiness,"DECIMAL(9,6)",YES,,"share of hours inside the US AV evidence envelope: sum share x weight, dust 0, rain 1/RR_rain, other covered conditions 1"
+Gold,gold.av_readiness_region_month,env_readiness_cons,"DECIMAL(9,6)",YES,,env_readiness with dry haze weight 0 (Saudi dry haze is mineral dust; California's is mostly smoke)
 Gold,gold.av_readiness_region_month,src_weather,NVARCHAR(200),NO,,weather lineage
 Gold,gold.av_readiness_region_month,src_accidents,NVARCHAR(400),YES,,accident lineage (workbooks)
-Gold,gold.av_readiness_region_month,src_av,NVARCHAR(200),NO,,AV lineage
+Gold,gold.av_readiness_region_month,src_traffic,NVARCHAR(200),YES,,GASTAT workbook and sheet of the traffic value
+Gold,gold.av_readiness_region_month,src_av,NVARCHAR(200),NO,,which AV evidence produced the av_* columns (prep.av_relative_risk v2: NHTSA state-month MH; DMV month x weekday MH)
 Gold,gold.av_readiness_region_month,gold_batch_id,UNIQUEIDENTIFIER,NO,,Gold load batch
 Gold,gold.av_readiness_region_month,gold_loaded_at,DATETIME2,NO,,time Gold was loaded
