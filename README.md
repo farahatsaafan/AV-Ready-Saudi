@@ -27,7 +27,7 @@ ambulance response time) are the other two pillars.
 
 | Family | Source | Grain | Origin |
 |---|---|---|---|
-| Weather | NOAA NCEI Global Hourly — 13 Saudi stations (one per region) + LAX, SFO, PHX, AUS, 2021 – Aug 2025 (incl. dew point) | weather report | Saudi + US |
+| Weather | NOAA NCEI Global Hourly — 13 Saudi stations (one per region) + LAX, SFO, PHX, AUS, 2021 – 25 Aug 2025, the end of NOAA's ISD product (incl. dew point) | weather report | Saudi + US |
 | Accidents | GASTAT transport statistics 2022–2025 (serious accidents, deaths, injuries by region) | region × year | Saudi |
 | Traffic | GASTAT monthly intercity traffic by region, every month 2021–2025 (same workbooks) | region × month | Saudi |
 | Population | GASTAT Census 2022 table (2010–2022) + GASTAT's own denominator from its published rates (2023–2025) | region × year | Saudi |
@@ -75,7 +75,9 @@ The script lands the raw files, copies `sql/` and `Data/landing/` into the conta
 (`sql/04_analysis.sql`), then: the independent pandas rebuild (`python/02_reference_gold.py`), the GLM cross-check of the
 AV evidence (`python/04_av_evidence_models.py`), the export of Gold to `Data/gold_export/` with a column-by-column
 comparison against the reference, and the readiness model (`python/05_readiness_model.py`, which writes
-`Data/model/`, `docs/figures/` and `docs/reports/04_eda_and_models.md`). Python code runs on Python 3.9+.
+`Data/model/`, `docs/figures/` and `docs/reports/04_eda_and_models.md`), and finally the results notebook
+(`notebooks/av_ready_saudi_results.ipynb`, run by `python/06_run_notebook.py`), which makes every figure and table of
+the paper's Results section in `docs/paper/` and checks that it reproduces the run. Python code runs on Python 3.9+.
 
 Windows (local SQL Server, e.g. SQLEXPRESS): `powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1`
 (add `-ServerInstance "localhost"` for a default instance). Step-by-step for the team, in Arabic:
@@ -94,6 +96,8 @@ python/02_reference_gold.py        independent pandas build of Silver / prep / G
 python/03_data_dictionary.py       rebuilds the data dictionary from the DDL
 python/04_av_evidence_models.py    GLM cross-check of the AV relative risks, robustness, hold-out, forest plot
 python/05_readiness_model.py       readiness score, KMeans tiers, weather -> accidents test, sensitivity, report 04
+python/06_run_notebook.py          runs the results notebook (pipeline step 8)
+notebooks/av_ready_saudi_results.ipynb  paper figures and tables, recomputed with the pipeline's own functions
 python/01_profile_raw_data.py      profiling helper
 sql/00_init.sql                    database, schemas, audit tables
 sql/01_bronze.sql                  Bronze tables + bronze.load_bronze
@@ -105,6 +109,7 @@ docs/05_relations_and_lineage.md   relations, rules, lineage, data shares, limit
 docs/07_erd.md                     ERD (Mermaid) + proposed-system diagram
 docs/reports/01-04                 Bronze, Silver, Gold reports; EDA, models and evaluation
 docs/figures/                      forest plot, readiness heatmap, pillars, losses, clusters, sensitivity
+docs/paper/figures, docs/paper/tables  made by the notebook for the IEEE paper (PNG 300 dpi, CSV)
 docs/02_data_dictionary.md         every column of every table (also data_dictionary.csv)
 docs/01_architecture_overview.md   layers and run order at a glance
 docs/04_team_collaboration_guide.md  setup guide for the team (Arabic)

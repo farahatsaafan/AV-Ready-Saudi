@@ -1,0 +1,8 @@
+family,varying_numeric_columns,share_pct
+weather (NOAA),25,51.0
+accidents (GASTAT),9,18.4
+"AV evidence (NHTSA, DMV)",5,10.2
+roads (GASTAT),4,8.2
+region service (GASTAT),3,6.1
+traffic (GASTAT),2,4.1
+population (GASTAT),1,2.0

@@ -1,4 +1,4 @@
-# Python packages used by the pipeline (python/00_land_raw.py ... python/05_readiness_model.py).
+# Python packages used by the pipeline (python/00_land_raw.py ... python/06_run_notebook.py).
 # run_pipeline_mac.sh / run_pipeline.ps1 install them into ./.venv automatically. Python 3.9+.
 pandas>=2.0
 numpy>=1.26
@@ -7,4 +7,7 @@ scipy>=1.10
 statsmodels>=0.14
 scikit-learn>=1.4
 matplotlib>=3.8
-# optional, to open notebooks in VS Code / Jupyter: ipykernel
+# results notebook (step 8; ipykernel also lets VS Code / Jupyter open it with the .venv kernel)
+nbformat>=5.9
+nbclient>=0.9
+ipykernel>=6.25

@@ -1,0 +1,6 @@
+data,condition_code,rr_mantel_haenszel,rr_glm,glm_ci_low,glm_ci_high,diff_pct
+nhtsa_crash,rain,1.515,1.482,1.119,1.964,-2.154
+nhtsa_crash,obscured_unspecified,0.024,0.024,0.006,0.098,2.163
+dmv_disengagement,rain,1.044,1.095,1.06,1.131,4.912
+dmv_disengagement,fog_moist,0.973,0.98,0.957,1.003,0.697
+dmv_disengagement,haze_dry,1.126,1.092,1.06,1.124,-3.043

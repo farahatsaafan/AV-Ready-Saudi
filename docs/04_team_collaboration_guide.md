@@ -70,6 +70,10 @@ powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1 -ServerInstance "loc
 6. تصدير جدول Gold لـ `Data/gold_export/` ومقارنته عمود بعمود بالـ reference (`--compare`).
 7. `python/05_readiness_model.py`: الـ readiness score والـ clustering والـ supervised test والـ sensitivity،
    وبيكتب `docs/reports/04_eda_and_models.md` والرسومات في `docs/figures/`.
+8. `python/06_run_notebook.py`: بيشغّل `notebooks/av_ready_saudi_results.ipynb`، اللي بيطلّع كل figures وجداول
+   الـ Results بتاعة الورقة في `docs/paper/`، وبيتأكد إن نتايجه هي نفس نتايج الـ run.
+
+تقدر كمان تفتح الـ notebook في VS Code (extension اسمها Jupyter)، تختار الـ kernel بتاع `.venv`، وتدوس Run All.
 
 لازم كل الـ checks تطلع **PASS**، والمقارنة في الخطوة 6 تطلع `RESULT: PASS`. التشغيل الكامل بياخد حوالي 7 دقايق على الماك.
 

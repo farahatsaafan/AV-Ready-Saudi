@@ -9,6 +9,7 @@
 #   5. python/04_av_evidence_models.py  GLM cross-check of the AV relative risks + forest plot
 #   6. export Gold -> Data/gold_export/gold_av_readiness_region_month.csv, then compare SQL Gold with the reference
 #   7. python/05_readiness_model.py  readiness score, clustering, supervised test, sensitivity, figures
+#   8. python/06_run_notebook.py     runs notebooks/av_ready_saudi_results.ipynb: paper figures + tables
 #
 # Usage (from the project folder):
 #   SA_PASSWORD='your-sa-password' bash run_pipeline_mac.sh
@@ -22,16 +23,17 @@ PW="${SA_PASSWORD:?set SA_PASSWORD first, e.g. SA_PASSWORD='...' bash run_pipeli
 case "$PW" in "..."|"your-sa-password"|"") echo "SA_PASSWORD is still the placeholder - use the real sa password of your container."; exit 1;; esac
 
 # Python environment: landing needs openpyxl; the reference build pandas + numpy; the models statsmodels,
-# scipy, scikit-learn and matplotlib. Created once in ./.venv so the system Python is never touched.
+# scipy, scikit-learn and matplotlib; the results notebook nbformat, nbclient and ipykernel.
+# Created once in ./.venv so the system Python is never touched.
 if [ ! -x .venv/bin/python ]; then
   echo ">>> Creating .venv (first run only)"
   "${PYTHON:-python3}" -m venv .venv
 fi
 PY=.venv/bin/python
-if ! "$PY" -c "import openpyxl, pandas, numpy, statsmodels, scipy, sklearn, matplotlib" 2>/dev/null; then
-  echo ">>> Installing openpyxl, pandas, numpy, statsmodels, scipy, scikit-learn, matplotlib into .venv"
+if ! "$PY" -c "import openpyxl, pandas, numpy, statsmodels, scipy, sklearn, matplotlib, nbformat, nbclient, ipykernel" 2>/dev/null; then
+  echo ">>> Installing the packages of requirements.txt into .venv"
   "$PY" -m pip install --quiet --upgrade pip
-  "$PY" -m pip install --quiet openpyxl pandas numpy statsmodels scipy scikit-learn matplotlib
+  "$PY" -m pip install --quiet -r requirements.txt
 fi
 
 [ -d Data/raw ] || { echo "Missing Data/raw (see docs/DATA_SOURCES.md)"; exit 1; }
@@ -106,6 +108,12 @@ echo
 echo ">>> 7. Readiness score, clustering, supervised test, sensitivity (reads the Gold export)"
 if [ -f python/05_readiness_model.py ]; then
   "$PY" python/05_readiness_model.py || echo "Readiness model failed (see above)"
+fi
+
+echo
+echo ">>> 8. Results notebook: paper figures and tables (notebooks/av_ready_saudi_results.ipynb)"
+if [ -f notebooks/av_ready_saudi_results.ipynb ]; then
+  "$PY" python/06_run_notebook.py || echo "Results notebook failed (see above)"
 fi
 
 echo

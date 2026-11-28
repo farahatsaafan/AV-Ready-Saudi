@@ -1,0 +1,8 @@
+condition,saudi_pct_of_hours,us_crash_exposure_pct_of_hours
+normal,94.34,93.01
+dust / sand,3.49,0.02
+fog or haze (any),1.67,4.35
+rain,0.51,2.62
+dry haze,1.16,
+moist fog / mist,0.51,
+hours >= 40 °C,6.11,

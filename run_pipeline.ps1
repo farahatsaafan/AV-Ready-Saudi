@@ -8,6 +8,7 @@ AV-Ready-Saudi - full pipeline on Windows (local SQL Server instance)
   5. python\04_av_evidence_models.py  GLM cross-check of the AV relative risks + forest plot
   6. export Gold -> Data\gold_export\gold_av_readiness_region_month.csv, compare SQL Gold with the reference
   7. python\05_readiness_model.py  readiness score, clustering, supervised test, sensitivity, figures
+  8. python\06_run_notebook.py     runs notebooks\av_ready_saudi_results.ipynb: paper figures + tables
 Usage (from the project folder, PowerShell 5.1 or 7):
   powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1
   powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1 -ServerInstance "localhost"
@@ -49,11 +50,11 @@ if (-not (Test-Path $py)) {
     & $sysPy -m venv .venv
     if ($LASTEXITCODE -ne 0) { throw "Failed: python -m venv .venv" }
 }
-& $py -c "import openpyxl, pandas, numpy, statsmodels, scipy, sklearn, matplotlib" 2>$null
+& $py -c "import openpyxl, pandas, numpy, statsmodels, scipy, sklearn, matplotlib, nbformat, nbclient, ipykernel" 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host ">>> Installing openpyxl, pandas, numpy, statsmodels, scipy, scikit-learn, matplotlib into .venv" -ForegroundColor Yellow
     & $py -m pip install --quiet --upgrade pip
-    & $py -m pip install --quiet openpyxl pandas numpy statsmodels scipy scikit-learn matplotlib
+    & $py -m pip install --quiet -r (Join-Path $PSScriptRoot "requirements.txt")
     if ($LASTEXITCODE -ne 0) { throw "Failed: pip install" }
 }
 
@@ -117,6 +118,12 @@ if (Test-Path (Join-Path $PSScriptRoot "python\05_readiness_model.py")) {
     Write-Host ">>> 05_readiness_model.py" -ForegroundColor Yellow
     & $py (Join-Path $PSScriptRoot "python\05_readiness_model.py")
     if ($LASTEXITCODE -ne 0) { Write-Host "Readiness model failed" -ForegroundColor Red }
+}
+
+if (Test-Path (Join-Path $PSScriptRoot "notebooks\av_ready_saudi_results.ipynb")) {
+    Write-Host ">>> 06_run_notebook.py (paper figures and tables)" -ForegroundColor Yellow
+    & $py (Join-Path $PSScriptRoot "python\06_run_notebook.py")
+    if ($LASTEXITCODE -ne 0) { Write-Host "Results notebook failed" -ForegroundColor Red }
 }
 
 Write-Host "Done. Gold table: gold.av_readiness_region_month (export: Data\gold_export\)" -ForegroundColor Green

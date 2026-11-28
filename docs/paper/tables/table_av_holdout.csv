@@ -1,0 +1,3 @@
+model,train_days,test_days,nb_alpha,test_deviance,test_mae
+month-of-year + weekday,1064,366,0.906,1536.524,63.49
+month-of-year + weekday + day_type,1064,366,0.884,1689.437,63.958
