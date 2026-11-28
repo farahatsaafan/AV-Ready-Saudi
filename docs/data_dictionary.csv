@@ -1,157 +1,387 @@
-layer,table,column,data_type,definition,source,pii_flag,nullable,quality_rule
-bronze,sa_weather,date,VARCHAR(50),Observation calendar date as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,temp_max_c,VARCHAR(50),Daily maximum temperature Celsius as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,temp_min_c,VARCHAR(50),Daily minimum temperature Celsius as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,temp_mean_c,VARCHAR(50),Daily mean temperature Celsius as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,precipitation_mm,VARCHAR(50),Daily total precipitation mm as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,wind_speed_max_kmh,VARCHAR(50),Peak sustained wind speed km/h as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,wind_gusts_max_kmh,VARCHAR(50),Peak instantaneous wind gust km/h as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,solar_radiation_mj,VARCHAR(50),Daily total solar radiation MJ/m2 as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,weather_code_wmo,VARCHAR(50),WMO standardized weather code as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,city_id,VARCHAR(50),3-letter city airport code as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,city_name_en,VARCHAR(100),English city name as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,city_name_ar,NVARCHAR(100),Arabic city name as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,latitude,VARCHAR(50),City centroid latitude as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,longitude,VARCHAR(50),City centroid longitude as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,is_dust_storm,VARCHAR(50),Flag indicating dust storm condition as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,is_extreme_heat,VARCHAR(50),Flag indicating extreme heat (>45C) as received,saudi_weather_daily_2019_2024.csv,no,yes,none (raw)
-bronze,sa_weather,source_file,VARCHAR(500),Provenance: name of ingested raw file,system default,no,yes,valid file name
-bronze,sa_weather,ingested_at,DATETIME2,Provenance: precise timestamp of ingestion,system default,no,no,not in future
-bronze,sa_traffic_accidents,accident_id,VARCHAR(50),Traffic accident tracking ID as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,date,VARCHAR(50),Accident date as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,city_id,VARCHAR(50),Nearest urban center ID as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,road_name,NVARCHAR(150),Corridor or highway name as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,severity,VARCHAR(50),Crash severity category as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,primary_cause,VARCHAR(100),Primary collision cause attribution as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,vehicles_involved,VARCHAR(50),Count of vehicles involved as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,casualties_count,VARCHAR(50),Count of injured or deceased as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,weather_condition_code,VARCHAR(50),WMO weather code at crash site as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,ambient_temp_c,VARCHAR(50),Ambient temperature at crash time as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,wind_gusts_kmh,VARCHAR(50),Peak wind gusts at crash time as received,saudi_traffic_accidents_2019_2024.csv,no,yes,none (raw)
-bronze,sa_traffic_accidents,source_file,VARCHAR(500),Provenance: name of ingested raw file,system default,no,yes,valid file name
-bronze,sa_traffic_accidents,ingested_at,DATETIME2,Provenance: precise timestamp of ingestion,system default,no,no,not in future
-bronze,av_telemetry,telemetry_id,VARCHAR(50),Vehicle telemetry tracking ID as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,date,VARCHAR(50),Telemetry observation date as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,city_id,VARCHAR(50),Operating city ID as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,vehicle_id,VARCHAR(50),Autonomous vehicle fleet unit ID as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,speed_kmh,VARCHAR(50),Vehicle operating speed km/h as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,battery_temp_c,VARCHAR(50),EV battery pack core temperature Celsius as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,gpu_temp_c,VARCHAR(50),On-board AI compute GPU temperature Celsius as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,tire_pressure_psi,VARCHAR(50),Vehicle tire pressure PSI as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,lidar_attenuation_pct,VARCHAR(50),LiDAR pulse beam absorption percentage as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,camera_glare_index,VARCHAR(50),Camera lens direct solar saturation index as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,failure_occurred,VARCHAR(50),Binary flag indicating system failure as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,failure_type,VARCHAR(100),Specific component failure classification as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,severity,VARCHAR(50),Telemetry event severity level as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,av_disengagement,VARCHAR(50),Binary flag indicating autonomous disengagement as received,av_telemetry_failures_saudi.csv,no,yes,none (raw)
-bronze,av_telemetry,source_file,VARCHAR(500),Provenance: name of ingested raw file,system default,no,yes,valid file name
-bronze,av_telemetry,ingested_at,DATETIME2,Provenance: precise timestamp of ingestion,system default,no,no,not in future
-silver,sa_weather,weather_id,INT,Surrogate primary key,IDENTITY(1.1),no,no,positive integer
-silver,sa_weather,weather_date,DATE,Standardized observation date,bronze.sa_weather,no,no,valid date between 2019-01-01 and 2024-12-31
-silver,sa_weather,city_id,VARCHAR(10),Standardized 3-letter city airport code,bronze.sa_weather,no,no,in ('RUH','JED','DMM','MAK','MED','TIF','ABH','TBK','HAS','ULA')
-silver,sa_weather,city_name_en,NVARCHAR(100),English city name capitalized,bronze.sa_weather,no,no,trimmed not empty
-silver,sa_weather,city_name_ar,NVARCHAR(100),Arabic city name UTF-8,bronze.sa_weather,no,no,trimmed not empty
-silver,sa_weather,latitude,DECIMAL(10.6),City centroid latitude,bronze.sa_weather,no,no,between 16.0 and 33.0
-silver,sa_weather,longitude,DECIMAL(10.6),City centroid longitude,bronze.sa_weather,no,no,between 34.0 and 56.0
-silver,sa_weather,temp_max_c,DECIMAL(5.2),Maximum daily temperature Celsius,bronze.sa_weather,no,no,between -10.0 and 60.0
-silver,sa_weather,temp_min_c,DECIMAL(5.2),Minimum daily temperature Celsius,bronze.sa_weather,no,no,between -15.0 and 45.0
-silver,sa_weather,temp_mean_c,DECIMAL(5.2),Mean daily temperature Celsius,bronze.sa_weather,no,no,between -10.0 and 50.0
-silver,sa_weather,precipitation_mm,DECIMAL(6.2),Daily total precipitation mm,bronze.sa_weather,no,no,non-negative
-silver,sa_weather,wind_speed_max_kmh,DECIMAL(5.2),Maximum sustained wind speed km/h,bronze.sa_weather,no,no,non-negative
-silver,sa_weather,wind_gusts_max_kmh,DECIMAL(5.2),Peak instantaneous wind gusts km/h,bronze.sa_weather,no,no,non-negative
-silver,sa_weather,solar_radiation_mj,DECIMAL(6.2),Daily solar irradiance MJ/m2,bronze.sa_weather,no,no,non-negative
-silver,sa_weather,weather_code_wmo,INT,Standard WMO meteorological code,bronze.sa_weather,no,no,valid WMO code 0 to 99
-silver,sa_weather,is_dust_storm,BIT,Binary indicator for active sand/dust storm,bronze.sa_weather,no,no,0 or 1
-silver,sa_weather,is_extreme_heat,BIT,Binary indicator for ambient heat >= 45C,bronze.sa_weather,no,no,0 or 1
-silver,sa_weather,DW_create_date,DATETIME2,Lineage: timestamp when Silver row was committed,system default,no,no,not in future
-silver,sa_traffic_accidents,accident_surrogate_id,INT,Surrogate primary key,IDENTITY(1.1),no,no,positive integer
-silver,sa_traffic_accidents,accident_id,VARCHAR(50),Unique business crash identifier,bronze.sa_traffic_accidents,no,no,unique not empty
-silver,sa_traffic_accidents,accident_date,DATE,Standardized date of collision,bronze.sa_traffic_accidents,no,no,valid date between 2019 and 2024
-silver,sa_traffic_accidents,city_id,VARCHAR(10),Nearest city corridor hub,bronze.sa_traffic_accidents,no,no,valid city code
-silver,sa_traffic_accidents,road_name,NVARCHAR(150),Corridor highway name,bronze.sa_traffic_accidents,no,no,not empty
-silver,sa_traffic_accidents,severity,NVARCHAR(50),Standardized crash severity tier,bronze.sa_traffic_accidents,no,no,in ('FATAL_CHAIN_COLLISION','HIGH_MULTI_VEHICLE','HIGH','MODERATE','MINOR')
-silver,sa_traffic_accidents,primary_cause,NVARCHAR(100),Root cause attribution,bronze.sa_traffic_accidents,no,no,not empty
-silver,sa_traffic_accidents,vehicles_involved,INT,Total vehicles involved in collision,bronze.sa_traffic_accidents,no,no,greater than or equal to 1
-silver,sa_traffic_accidents,casualties_count,INT,Total injured or deceased casualties,bronze.sa_traffic_accidents,no,no,non-negative
-silver,sa_traffic_accidents,weather_condition_code,INT,Meteorological code at crash site,bronze.sa_traffic_accidents,no,yes,0 to 99 or NULL
-silver,sa_traffic_accidents,ambient_temp_c,DECIMAL(5.2),Ambient temperature at collision Celsius,bronze.sa_traffic_accidents,no,yes,between -10.0 and 60.0
-silver,sa_traffic_accidents,wind_gusts_kmh,DECIMAL(5.2),Wind gusts at collision km/h,bronze.sa_traffic_accidents,no,yes,non-negative
-silver,sa_traffic_accidents,DW_create_date,DATETIME2,Lineage: timestamp when Silver row was committed,system default,no,no,not in future
-silver,av_telemetry,telemetry_surrogate_id,INT,Surrogate primary key,IDENTITY(1.1),no,no,positive integer
-silver,av_telemetry,telemetry_id,VARCHAR(50),Unique business telemetry identifier,bronze.av_telemetry,no,no,unique not empty
-silver,av_telemetry,telemetry_date,DATE,Standardized observation date,bronze.av_telemetry,no,no,valid date between 2019 and 2024
-silver,av_telemetry,city_id,VARCHAR(10),Operating city code,bronze.av_telemetry,no,no,valid city code
-silver,av_telemetry,vehicle_id,VARCHAR(50),Fleet autonomous vehicle identifier,bronze.av_telemetry,no,no,pattern AV-SAUDI-XXX
-silver,av_telemetry,speed_kmh,DECIMAL(6.2),Operating vehicle speed km/h,bronze.av_telemetry,no,no,between 0.0 and 200.0
-silver,av_telemetry,battery_temp_c,DECIMAL(5.2),EV battery pack core temperature Celsius,bronze.av_telemetry,no,no,between 0.0 and 70.0
-silver,av_telemetry,gpu_temp_c,DECIMAL(5.2),AI compute GPU temperature Celsius,bronze.av_telemetry,no,no,between 20.0 and 95.0
-silver,av_telemetry,tire_pressure_psi,DECIMAL(5.2),Vehicle tire pressure PSI,bronze.av_telemetry,no,no,between 20.0 and 60.0
-silver,av_telemetry,lidar_attenuation_pct,DECIMAL(5.2),LiDAR pulse signal attenuation percentage,bronze.av_telemetry,no,no,between 0.0 and 100.0
-silver,av_telemetry,camera_glare_index,DECIMAL(4.2),Camera sensor direct solar blinding index,bronze.av_telemetry,no,no,between 0.0 and 1.0
-silver,av_telemetry,failure_occurred,BIT,Binary failure indicator flag,bronze.av_telemetry,no,no,0 or 1
-silver,av_telemetry,failure_type,NVARCHAR(100),Component failure mode description,bronze.av_telemetry,no,no,in ('NONE','LIDAR_DUST_OCCLUSION','CAMERA_SOLAR_BLINDING','BATTERY_THERMAL_THROTTLING','LANE_DETECTION_WATER_REFLECTION')
-silver,av_telemetry,severity,NVARCHAR(50),Standardized severity classification,bronze.av_telemetry,no,no,in ('NORMAL','MEDIUM','HIGH','CRITICAL')
-silver,av_telemetry,av_disengagement,BIT,Binary autonomous disengagement event,bronze.av_telemetry,no,no,0 or 1
-silver,av_telemetry,DW_create_date,DATETIME2,Lineage: timestamp when Silver row was committed,system default,no,no,not in future
-silver,reject_log,reject_id,BIGINT,Surrogate reject primary key,IDENTITY(1.1),no,no,positive integer
-silver,reject_log,source_table,VARCHAR(50),Name of the source table where defect occurred,system default,no,no,not empty
-silver,reject_log,business_key,VARCHAR(50),Natural identifier of the rejected row,source row,no,yes,identifier or NULL
-silver,reject_log,reason,VARCHAR(100),Actionable root cause explanation for rejection,validation logic,no,no,not empty
-silver,reject_log,DW_create_date,DATETIME2,Lineage: timestamp when row was quarantined,system default,no,no,not in future
-gold,dim_city,city_key,INT,Surrogate city dimension key,ROW_NUMBER(),no,no,positive integer
-gold,dim_city,city_id,VARCHAR(10),3-letter city airport code,silver.sa_weather,no,no,unique
-gold,dim_city,city_name_en,NVARCHAR(100),English city name,silver.sa_weather,no,no,not empty
-gold,dim_city,city_name_ar,NVARCHAR(100),Arabic city name UTF-8,silver.sa_weather,no,no,not empty
-gold,dim_city,latitude,DECIMAL(10.6),City latitude coordinate,silver.sa_weather,no,no,valid coordinate
-gold,dim_city,longitude,DECIMAL(10.6),City longitude coordinate,silver.sa_weather,no,no,valid coordinate
-gold,dim_city,climate_zone,VARCHAR(50),Regional climatic classification,business rules,no,no,not empty
-gold,dim_date,date_key,INT,Surrogate date key in YYYYMMDD format,conversion,no,no,integer 8 digits
-gold,dim_date,calendar_date,DATE,Calendar date,silver.sa_weather,no,no,between 2019 and 2024
-gold,dim_date,year_number,INT,Calendar year,silver.sa_weather,no,no,between 2019 and 2024
-gold,dim_date,month_number,INT,Calendar month,silver.sa_weather,no,no,between 1 and 12
-gold,dim_date,month_name,VARCHAR(20),English month name,silver.sa_weather,no,no,not empty
-gold,dim_date,quarter_number,INT,Calendar quarter,silver.sa_weather,no,no,between 1 and 4
-gold,dim_weather_hazard,hazard_key,INT,Surrogate hazard dimension key,ROW_NUMBER(),no,no,positive integer
-gold,dim_weather_hazard,weather_code_wmo,INT,WMO standard meteorological code,silver.sa_weather,no,no,0 to 99
-gold,dim_weather_hazard,sensor_hazard_level,NVARCHAR(20),AV sensor hazard rating tier,business taxonomy,no,no,in ('LOW','MEDIUM','HIGH','CRITICAL')
-gold,dim_weather_hazard,lidar_impact,NVARCHAR(150),Specific physical impact on LiDAR sensors,domain rules,no,no,not empty
-gold,dim_weather_hazard,camera_impact,NVARCHAR(150),Specific physical impact on optical cameras,domain rules,no,no,not empty
-gold,dim_av_failure_type,failure_type_key,INT,Surrogate failure type key,ROW_NUMBER(),no,no,positive integer
-gold,dim_av_failure_type,failure_type,NVARCHAR(100),Component failure classification,silver.av_telemetry,no,no,unique
-gold,dim_av_failure_type,subsystem,NVARCHAR(50),Automotive AV subsystem affected,taxonomy,no,no,in ('PERCEPTION_LIDAR','PERCEPTION_CAMERA','COMPUTE_HARDWARE','POWERTRAIN')
-gold,dim_av_failure_type,risk_level,NVARCHAR(20),Safety risk classification,taxonomy,no,no,in ('NORMAL','MEDIUM','HIGH','CRITICAL')
-gold,fact_daily_av_risk,city_key,INT,Foreign key referencing dim_city,gold.dim_city,no,no,valid foreign key
-gold,fact_daily_av_risk,date_key,INT,Foreign key referencing dim_date,gold.dim_date,no,no,valid foreign key
-gold,fact_daily_av_risk,hazard_key,INT,Foreign key referencing dim_weather_hazard,gold.dim_weather_hazard,no,no,valid foreign key
-gold,fact_daily_av_risk,avg_temp_c,DECIMAL(5.2),Mean daily temperature Celsius,silver.sa_weather,no,no,valid temperature
-gold,fact_daily_av_risk,max_temp_c,DECIMAL(5.2),Peak daily temperature Celsius,silver.sa_weather,no,no,valid temperature
-gold,fact_daily_av_risk,max_wind_gusts_kmh,DECIMAL(5.2),Peak wind gusts km/h,silver.sa_weather,no,no,non-negative
-gold,fact_daily_av_risk,is_dust_storm,BIT,Binary active dust storm indicator,silver.sa_weather,no,no,0 or 1
-gold,fact_daily_av_risk,is_extreme_heat,BIT,Binary ambient heat >= 45C indicator,silver.sa_weather,no,no,0 or 1
-gold,fact_daily_av_risk,daily_accident_count,INT,Aggregated highway accidents on this day,silver.sa_traffic_accidents,no,no,non-negative
-gold,fact_daily_av_risk,daily_casualties_count,INT,Aggregated casualties on this day,silver.sa_traffic_accidents,no,no,non-negative
-gold,fact_daily_av_risk,daily_av_trips_count,INT,Total recorded AV fleet trips on this day,silver.av_telemetry,no,no,non-negative
-gold,fact_daily_av_risk,daily_disengagements_count,INT,Total autonomous disengagements on this day,silver.av_telemetry,no,no,non-negative
-gold,fact_daily_av_risk,avg_lidar_attenuation_pct,DECIMAL(5.2),Mean LiDAR signal attenuation percentage,silver.av_telemetry,no,yes,between 0.0 and 100.0
-gold,fact_daily_av_risk,avg_camera_glare_index,DECIMAL(4.2),Mean camera solar glare saturation index,silver.av_telemetry,no,yes,between 0.0 and 1.0
-gold,fact_daily_av_risk,av_readiness_score,DECIMAL(5.2),Synthesized composite readiness index (0 to 100),composite formula,no,no,between 0.0 and 100.0
-gold,fact_daily_av_risk,DW_create_date,DATETIME2,Lineage: timestamp when Fact row was materialized,system default,no,no,not in future
-semantic,metric_catalog,metric_name,VARCHAR(100),Unique machine-readable metric identifier,semantic/metrics.yml,no,no,unique primary key
-semantic,metric_catalog,label,VARCHAR(200),Human-readable business metric title,semantic/metrics.yml,no,yes,not empty
-semantic,metric_catalog,definition,VARCHAR(1000),Formal analytical business definition,semantic/metrics.yml,no,no,not empty
-semantic,metric_catalog,owner,VARCHAR(100),Responsible team or analyst,semantic/metrics.yml,no,yes,not empty
-semantic,metric_catalog,grain,VARCHAR(200),Grain of the source fact table,semantic/metrics.yml,no,yes,explicit grain
-semantic,metric_catalog,sql_expression,VARCHAR(1000),Standard SQL aggregation formula,semantic/metrics.yml,no,no,valid SQL aggregation
-semantic,metric_catalog,dimensions,VARCHAR(500),Applicable slice and dice dimensions,semantic/metrics.yml,no,yes,comma-separated list
-semantic,metric_catalog,null_policy,VARCHAR(500),Policy for handling NULL and missing values,semantic/metrics.yml,no,yes,policy description
-semantic,metric_catalog,validation_query,VARCHAR(2000),Independent verification query,semantic/metrics.yml,no,yes,executable SQL
-semantic,metric_catalog,updated_at,DATETIME2,Last synchronization timestamp,system default,no,no,not in future
-ml,city_risk_clusters,city_id,VARCHAR(10),Natural city identifier,gold.features_city_monthly,no,no,valid city code
-ml,city_risk_clusters,year_number,INT,Calendar year of clustered period,gold.features_city_monthly,no,no,between 2019 and 2024
-ml,city_risk_clusters,month_number,INT,Calendar month of clustered period,gold.features_city_monthly,no,no,between 1 and 12
-ml,city_risk_clusters,cluster_id,INT,Assigned K-Means cluster (0=Optimal 1=Moderate 2=High Hazard),scikit-learn KMeans,no,no,integer 0 to 2
-ml,city_risk_clusters,operating_regime,VARCHAR(50),Assigned qualitative driving policy label,rule mapping,no,no,in ('OPTIMAL_REGIME','MODERATE_RISK_REGIME','HIGH_HAZARD_RESTRICTED')
-ml,city_risk_clusters,model_name,VARCHAR(100),Machine learning algorithm identifier,pipeline metadata,no,no,not empty
-ml,city_risk_clusters,model_version,VARCHAR(20),Version tracking identifier,pipeline metadata,no,no,e.g. v1.0
-ml,city_risk_clusters,run_id,VARCHAR(50),Unique execution GUID,pipeline metadata,no,no,valid UUID
-ml,city_risk_clusters,generated_at,DATETIME2,Model execution and inference timestamp,system default,no,no,not in future
+layer,table,column,data_type,nullable,key,description
+Bronze,bronze.noaa_hourly,source_file,NVARCHAR(400),YES,,raw file the row came from (path under Data/raw)
+Bronze,bronze.noaa_hourly,source_row_num,NVARCHAR(20),YES,,line number in the raw file
+Bronze,bronze.noaa_hourly,STATION,NVARCHAR(50),YES,,NOAA station id (USAF+WBAN)
+Bronze,bronze.noaa_hourly,DATE,NVARCHAR(50),YES,,"observation time, UTC (ISO 8601)"
+Bronze,bronze.noaa_hourly,SOURCE,NVARCHAR(20),YES,,ISD data source flag
+Bronze,bronze.noaa_hourly,LATITUDE,NVARCHAR(50),YES,,station latitude
+Bronze,bronze.noaa_hourly,LONGITUDE,NVARCHAR(50),YES,,station longitude
+Bronze,bronze.noaa_hourly,ELEVATION,NVARCHAR(50),YES,,station elevation (m)
+Bronze,bronze.noaa_hourly,NAME,NVARCHAR(200),YES,,station name
+Bronze,bronze.noaa_hourly,REPORT_TYPE,NVARCHAR(20),YES,,"report type (FM-15 METAR, FM-12 SYNOP, FM-16 SPECI, SOD/SOM summaries)"
+Bronze,bronze.noaa_hourly,CALL_SIGN,NVARCHAR(20),YES,,call sign
+Bronze,bronze.noaa_hourly,QUALITY_CONTROL,NVARCHAR(20),YES,,ISD QC process
+Bronze,bronze.noaa_hourly,WND,NVARCHAR(50),YES,,"wind group dir,q,type,speed(0.1 m/s),q"
+Bronze,bronze.noaa_hourly,CIG,NVARCHAR(50),YES,,ceiling group
+Bronze,bronze.noaa_hourly,VIS,NVARCHAR(50),YES,,"visibility group distance(m),q,var,q"
+Bronze,bronze.noaa_hourly,TMP,NVARCHAR(50),YES,,"air temperature group (0.1 degC),q"
+Bronze,bronze.noaa_hourly,DEW,NVARCHAR(50),YES,,dew point group
+Bronze,bronze.noaa_hourly,SLP,NVARCHAR(50),YES,,sea-level pressure group
+Bronze,bronze.noaa_hourly,AA1,NVARCHAR(50),YES,,"liquid precipitation group period(h),depth(0.1 mm),cond,q"
+Bronze,bronze.noaa_hourly,MW1,NVARCHAR(50),YES,,"manual present weather (WMO 4677),q"
+Bronze,bronze.noaa_hourly,AW1,NVARCHAR(50),YES,,"automated present weather (WMO 4680),q"
+Bronze,bronze.noaa_hourly,AU1,NVARCHAR(50),YES,,"METAR-style present weather intensity,descriptor,precip,obscuration,other,combo,q"
+Bronze,bronze.noaa_hourly,extra_json,NVARCHAR(MAX),YES,,all other columns of the raw row as {header: value}
+Bronze,bronze.noaa_hourly,row_end,NVARCHAR(10),YES,,"line-end marker from landing (always ""."")"
+Bronze,bronze.noaa_hourly,load_batch_id,UNIQUEIDENTIFIER,YES,,Bronze load batch
+Bronze,bronze.noaa_hourly,ingested_at,DATETIME2,NO,,time the row was loaded
+Bronze,bronze.gastat_cells,source_file,NVARCHAR(400),YES,,raw file the row came from (path under Data/raw)
+Bronze,bronze.gastat_cells,sheet_name,NVARCHAR(100),YES,,worksheet name
+Bronze,bronze.gastat_cells,row_num,NVARCHAR(20),YES,,Excel row number
+Bronze,bronze.gastat_cells,col_num,NVARCHAR(20),YES,,Excel column number
+Bronze,bronze.gastat_cells,cell_value,NVARCHAR(MAX),YES,,cell text as stored (formulas kept as text)
+Bronze,bronze.gastat_cells,row_end,NVARCHAR(10),YES,,"line-end marker from landing (always ""."")"
+Bronze,bronze.gastat_cells,load_batch_id,UNIQUEIDENTIFIER,YES,,Bronze load batch
+Bronze,bronze.gastat_cells,ingested_at,DATETIME2,NO,,time the row was loaded
+Bronze,bronze.dmv_disengagements,source_file,NVARCHAR(400),YES,,raw file the row came from (path under Data/raw)
+Bronze,bronze.dmv_disengagements,source_row_num,NVARCHAR(20),YES,,line number in the raw file
+Bronze,bronze.dmv_disengagements,manufacturer,NVARCHAR(400),YES,,AV company
+Bronze,bronze.dmv_disengagements,permit_number,NVARCHAR(100),YES,,DMV permit number
+Bronze,bronze.dmv_disengagements,date_raw,NVARCHAR(100),YES,,date as written in the report
+Bronze,bronze.dmv_disengagements,vin,NVARCHAR(100),YES,,vehicle identification number
+Bronze,bronze.dmv_disengagements,capable_without_driver,NVARCHAR(100),YES,,vehicle capable of driverless operation (Yes/No)
+Bronze,bronze.dmv_disengagements,driver_present,NVARCHAR(100),YES,,driver present (Yes/No)
+Bronze,bronze.dmv_disengagements,initiated_by,NVARCHAR(200),YES,,who initiated the disengagement
+Bronze,bronze.dmv_disengagements,location,NVARCHAR(200),YES,,disengagement location as written
+Bronze,bronze.dmv_disengagements,description,NVARCHAR(MAX),YES,,facts causing the disengagement (free text)
+Bronze,bronze.dmv_disengagements,extra_json,NVARCHAR(MAX),YES,,all other columns of the raw row as {header: value}
+Bronze,bronze.dmv_disengagements,row_end,NVARCHAR(10),YES,,"line-end marker from landing (always ""."")"
+Bronze,bronze.dmv_disengagements,load_batch_id,UNIQUEIDENTIFIER,YES,,Bronze load batch
+Bronze,bronze.dmv_disengagements,ingested_at,DATETIME2,NO,,time the row was loaded
+Bronze,bronze.dmv_mileage,source_file,NVARCHAR(400),YES,,raw file the row came from (path under Data/raw)
+Bronze,bronze.dmv_mileage,source_row_num,NVARCHAR(20),YES,,line number in the raw file
+Bronze,bronze.dmv_mileage,manufacturer,NVARCHAR(400),YES,,AV company
+Bronze,bronze.dmv_mileage,permit_number,NVARCHAR(100),YES,,DMV permit number
+Bronze,bronze.dmv_mileage,vin,NVARCHAR(100),YES,,vehicle identification number
+Bronze,bronze.dmv_mileage,annual_disengagements,NVARCHAR(100),YES,,annual total of disengagements for the vehicle
+Bronze,bronze.dmv_mileage,months_json,NVARCHAR(MAX),YES,,"month columns (""DEC 2020"", ""JAN 2021""...) and ANNUAL TOTAL as JSON"
+Bronze,bronze.dmv_mileage,row_end,NVARCHAR(10),YES,,"line-end marker from landing (always ""."")"
+Bronze,bronze.dmv_mileage,load_batch_id,UNIQUEIDENTIFIER,YES,,Bronze load batch
+Bronze,bronze.dmv_mileage,ingested_at,DATETIME2,NO,,time the row was loaded
+Bronze,bronze.nhtsa_sgo_ads,source_file,NVARCHAR(400),YES,,raw file the row came from (path under Data/raw)
+Bronze,bronze.nhtsa_sgo_ads,source_row_num,NVARCHAR(20),YES,,line number in the raw file
+Bronze,bronze.nhtsa_sgo_ads,Report ID,NVARCHAR(100),YES,,NHTSA report id
+Bronze,bronze.nhtsa_sgo_ads,Report Version,NVARCHAR(20),YES,,report version (higher = newer)
+Bronze,bronze.nhtsa_sgo_ads,Reporting Entity,NVARCHAR(200),YES,,company that filed the report
+Bronze,bronze.nhtsa_sgo_ads,Make,NVARCHAR(200),YES,,vehicle make
+Bronze,bronze.nhtsa_sgo_ads,Model,NVARCHAR(200),YES,,vehicle model
+Bronze,bronze.nhtsa_sgo_ads,Model Year,NVARCHAR(50),YES,,vehicle model year
+Bronze,bronze.nhtsa_sgo_ads,State,NVARCHAR(50),YES,,US state
+Bronze,bronze.nhtsa_sgo_ads,City,NVARCHAR(200),YES,,city
+Bronze,bronze.nhtsa_sgo_ads,Incident Date,NVARCHAR(50),YES,,incident month (MMM-YYYY)
+Bronze,bronze.nhtsa_sgo_ads,Incident Time (24:00),NVARCHAR(50),YES,,incident local time
+Bronze,bronze.nhtsa_sgo_ads,Roadway Type,NVARCHAR(100),YES,,roadway type
+Bronze,bronze.nhtsa_sgo_ads,Posted Speed Limit (MPH),NVARCHAR(50),YES,,posted speed limit
+Bronze,bronze.nhtsa_sgo_ads,Lighting,NVARCHAR(100),YES,,lighting condition (archive file only)
+Bronze,bronze.nhtsa_sgo_ads,row_json,NVARCHAR(MAX),YES,,the complete raw row as {header: value}
+Bronze,bronze.nhtsa_sgo_ads,row_end,NVARCHAR(10),YES,,"line-end marker from landing (always ""."")"
+Bronze,bronze.nhtsa_sgo_ads,load_batch_id,UNIQUEIDENTIFIER,YES,,Bronze load batch
+Bronze,bronze.nhtsa_sgo_ads,ingested_at,DATETIME2,NO,,time the row was loaded
+Bronze,bronze.gastat_population,source_file,NVARCHAR(400),YES,,raw file the row came from (path under Data/raw)
+Bronze,bronze.gastat_population,source_row_num,NVARCHAR(20),YES,,line number in the raw file
+Bronze,bronze.gastat_population,Gender,NVARCHAR(50),YES,,Male / Female (as published)
+Bronze,bronze.gastat_population,Nationality,NVARCHAR(50),YES,,Saudi / Non Saudi (as published)
+Bronze,bronze.gastat_population,Region,NVARCHAR(100),YES,,administrative region name as published by the census table (e.g. Ar Riyadh)
+Bronze,bronze.gastat_population,Year,NVARCHAR(20),YES,,"as published, in Arabic-Indic digits (U+0660..U+0669)"
+Bronze,bronze.gastat_population,Population,NVARCHAR(50),YES,,population count as published (text)
+Bronze,bronze.gastat_population,row_end,NVARCHAR(10),YES,,"line-end marker from landing (always ""."")"
+Bronze,bronze.gastat_population,load_batch_id,UNIQUEIDENTIFIER,YES,,Bronze batch that loaded the row
+Bronze,bronze.gastat_population,ingested_at,DATETIME2,NO,,load time
+Silver,silver.dim_region,region_code,CHAR(3),NO,PK,Saudi administrative region code (3 letters)
+Silver,silver.dim_region,region_name_en,NVARCHAR(50),NO,,"region name, English"
+Silver,silver.dim_region,region_name_ar,NVARCHAR(50),NO,,"region name, Arabic"
+Silver,silver.region_alias,alias_key,NVARCHAR(60),NO,PK,"normalised region label (lower case, no spaces/hyphens/""region""/""province"")"
+Silver,silver.region_alias,region_code,CHAR(3),NO,FK,Saudi administrative region code (3 letters)
+Silver,silver.dim_condition,condition_code,VARCHAR(25),NO,PK,"condition key of vocabulary v2: dust, haze_dry, fog_moist, rain, normal (hour buckets), obscured_unspecified, unknown (NHTSA only), day, night (light)"
+Silver,silver.dim_condition,factor,VARCHAR(10),NO,,weather / light
+Silver,silver.dim_condition,priority,TINYINT,YES,,"hour-bucket priority, 1 wins (dust > haze_dry > fog_moist > rain > normal); NULL = not an hour bucket"
+Silver,silver.dim_condition,label,NVARCHAR(80),NO,,readable name of the condition
+Silver,silver.dim_condition,rule_text,NVARCHAR(400),NO,,"the exact WMO 4677 / 4680 / METAR (AU1) code rule, visibility and dew-point rule that defines the condition"
+Silver,silver.dim_condition,us_av_coverage,VARCHAR(30),NO,,"uncovered (no US AV evidence: dust), covered, reference, nhtsa_category, excluded"
+Silver,silver.dim_station,station_id,CHAR(11),NO,PK,NOAA station id
+Silver,silver.dim_station,station_name,NVARCHAR(80),NO,,station name
+Silver,silver.dim_station,country,CHAR(2),NO,,SA or US
+Silver,silver.dim_station,region_code,CHAR(3),YES,FK,Saudi administrative region code (3 letters)
+Silver,silver.dim_station,us_state,CHAR(2),YES,,US state code (US stations)
+Silver,silver.dim_station,tz_name,VARCHAR(60),NO,,Windows time-zone name used with AT TIME ZONE
+Silver,silver.dim_station,latitude,FLOAT,NO,,latitude
+Silver,silver.dim_station,longitude,FLOAT,NO,,longitude
+Silver,silver.gastat_sheet_map,file_key,NVARCHAR(80),NO,,part of the workbook file name
+Silver,silver.gastat_sheet_map,sheet_name,NVARCHAR(20),NO,,worksheet name
+Silver,silver.gastat_sheet_map,metric,VARCHAR(30),NO,PK,"what the cells hold: accident metrics, road metrics, official rates per 100k, region service metrics, traffic_monthly"
+Silver,silver.gastat_sheet_map,data_year,SMALLINT,NO,PK,year the value refers to
+Silver,silver.gastat_sheet_map,col_num,INT,NO,,Excel column that holds the value
+Silver,silver.gastat_sheet_map,first_row,INT,NO,,first data row
+Silver,silver.gastat_sheet_map,last_row,INT,NO,,last data row
+Silver,silver.gastat_traffic_map,data_year,SMALLINT,NO,PK,year the traffic block describes (2021-2025)
+Silver,silver.gastat_traffic_map,file_key,NVARCHAR(80),NO,,GASTAT workbook (matched with LIKE)
+Silver,silver.gastat_traffic_map,sheet_name,NVARCHAR(20),NO,,sheet of the monthly traffic table
+Silver,silver.gastat_traffic_map,layout,VARCHAR(20),NO,,"car_truck_pairs (2021, 2022: region per column pair, months on rows) / region_rows (2023-2025: region per row, months on columns)"
+Silver,silver.gastat_traffic_map,header_row,INT,NO,,row holding the region names (car_truck_pairs) or the month names (region_rows)
+Silver,silver.gastat_traffic_map,first_row,INT,NO,,first data row (January for car_truck_pairs; first region for region_rows)
+Silver,silver.gastat_traffic_map,last_row,INT,NO,,last data row
+Silver,silver.gastat_traffic_map,definition,VARCHAR(40),NO,,avg_daily_per_count_point / total_div_points_days
+Silver,silver.reject_log,reject_id,BIGINT,NO,PK,surrogate key
+Silver,silver.reject_log,source_table,VARCHAR(60),NO,,Silver table the row was meant for
+Silver,silver.reject_log,source_file,NVARCHAR(400),YES,,raw file the row came from (path under Data/raw)
+Silver,silver.reject_log,source_row,NVARCHAR(40),YES,,row reference in the source
+Silver,silver.reject_log,reason,VARCHAR(200),NO,,rule that rejected the row
+Silver,silver.reject_log,raw_value,NVARCHAR(400),YES,,offending value
+Silver,silver.reject_log,dw_create_date,DATETIME2,NO,,time the Silver row was written
+Silver,silver.weather_obs,station_id,CHAR(11),NO,PK,NOAA station id
+Silver,silver.weather_obs,obs_utc,DATETIME2(0),NO,PK,observation time UTC
+Silver,silver.weather_obs,obs_local,DATETIME2(0),NO,,"observation time, station local time"
+Silver,silver.weather_obs,report_type,VARCHAR(10),NO,PK,report type (trimmed)
+Silver,silver.weather_obs,vis_m,INT,YES,,visibility in metres (NULL if missing or suspect)
+Silver,silver.weather_obs,temp_c,"DECIMAL(5,1)",YES,,air temperature degC
+Silver,silver.weather_obs,dew_c,"DECIMAL(5,1)",YES,,"dew point in degC, parsed from DEW exactly like TMP (+9999 = missing; quality 2/3/6/7 -> NULL)"
+Silver,silver.weather_obs,dew_spread_c,"DECIMAL(5,1)",YES,,temp_c - dew_c (small = moist air: fog / mist; large = dry air: dust haze)
+Silver,silver.weather_obs,wind_ms,"DECIMAL(5,1)",YES,,wind speed m/s
+Silver,silver.weather_obs,precip_1h_mm,"DECIMAL(6,1)",YES,,1-hour precipitation mm
+Silver,silver.weather_obs,mw_code,CHAR(2),YES,,manual present-weather code (WMO 4677)
+Silver,silver.weather_obs,aw_code,CHAR(2),YES,,automated present-weather code (WMO 4680)
+Silver,silver.weather_obs,au_precip,CHAR(2),YES,,METAR precipitation code
+Silver,silver.weather_obs,au_obscuration,CHAR(1),YES,,METAR obscuration code
+Silver,silver.weather_obs,au_other,CHAR(1),YES,,METAR other-phenomena code
+Silver,silver.weather_obs,sun_elev_deg,"DECIMAL(6,2)",YES,,solar elevation (degrees)
+Silver,silver.weather_obs,is_dust,BIT,NO,,dust or sand reported
+Silver,silver.weather_obs,is_haze,BIT,NO,,haze or smoke reported
+Silver,silver.weather_obs,is_fog,BIT,NO,,fog reported
+Silver,silver.weather_obs,is_rain,BIT,NO,,rain/precipitation reported or measured
+Silver,silver.weather_obs,is_low_vis,BIT,NO,,visibility < 5 km
+Silver,silver.weather_obs,is_night,BIT,NO,,sun below the horizon (elevation < -0.833 deg)
+Silver,silver.weather_obs,is_hot40,BIT,NO,,temp_c >= 40 degC
+Silver,silver.weather_obs,is_hot45,BIT,NO,,temp_c >= 45 degC
+Silver,silver.weather_obs,source_file,NVARCHAR(400),NO,,raw file the row came from (path under Data/raw)
+Silver,silver.weather_obs,source_row_num,INT,NO,,line number in the raw file
+Silver,silver.weather_obs,dw_create_date,DATETIME2,NO,,time the Silver row was written
+Silver,silver.accidents_region_year,region_code,CHAR(3),NO,PK,Saudi administrative region code (3 letters)
+Silver,silver.accidents_region_year,data_year,SMALLINT,NO,PK,year the value refers to
+Silver,silver.accidents_region_year,serious_accidents,INT,YES,,serious traffic accidents in the year
+Silver,silver.accidents_region_year,serious_within_cities,INT,YES,,serious accidents within cities (2024-2025)
+Silver,silver.accidents_region_year,serious_outside_cities,INT,YES,,serious accidents outside cities (2024-2025)
+Silver,silver.accidents_region_year,deaths,INT,YES,,road traffic deaths
+Silver,silver.accidents_region_year,injuries,INT,YES,,road traffic injuries
+Silver,silver.accidents_region_year,source_files,NVARCHAR(400),YES,,GASTAT workbooks the values came from
+Silver,silver.accidents_region_year,dw_create_date,DATETIME2,NO,,time the Silver row was written
+Silver,silver.roads_region_year,region_code,CHAR(3),NO,PK,Saudi administrative region (silver.dim_region)
+Silver,silver.roads_region_year,data_year,SMALLINT,NO,PK,year of the GASTAT road table (2022-2025)
+Silver,silver.roads_region_year,road_km_per_1000_people,"DECIMAL(9,3)",YES,,"whole network (within cities, intercity, dirt) / population"
+Silver,silver.roads_region_year,road_km_per_km2,"DECIMAL(9,4)",YES,,whole network / region area
+Silver,silver.roads_region_year,intercity_highway_km,"DECIMAL(10,1)",YES,,intercity road length classified as highway (fast road)
+Silver,silver.roads_region_year,intercity_dual_km,"DECIMAL(10,1)",YES,,intercity road length classified as dual carriageway (double)
+Silver,silver.roads_region_year,intercity_exit_km,"DECIMAL(10,1)",YES,,intercity road length classified as exit or roundabout
+Silver,silver.roads_region_year,intercity_single_km,"DECIMAL(10,1)",YES,,intercity road length classified as single carriageway
+Silver,silver.roads_region_year,intercity_total_km,"DECIMAL(10,1)",YES,,sum of the four types
+Silver,silver.roads_region_year,intercity_divided_share,"DECIMAL(6,4)",YES,,(highway + dual carriageway) / total
+Silver,silver.roads_region_year,source_files,NVARCHAR(400),YES,,GASTAT workbook(s) the values were read from
+Silver,silver.roads_region_year,dw_create_date,DATETIME2,NO,,Silver load time
+Silver,silver.population_region_year,region_code,CHAR(3),NO,PK,Saudi administrative region (silver.dim_region)
+Silver,silver.population_region_year,data_year,SMALLINT,NO,PK,converted from Arabic-Indic digits
+Silver,silver.population_region_year,population,INT,NO,,"all nationalities, both genders: census table count (2010-2022) or GASTAT's own denominator recovered from its published rate (2023-2025)"
+Silver,silver.population_region_year,population_saudi,INT,YES,,Saudi nationals (census rows only; NULL for rate-implied rows)
+Silver,silver.population_region_year,population_non_saudi,INT,YES,,non-Saudi residents (census rows only; NULL for rate-implied rows)
+Silver,silver.population_region_year,population_basis,VARCHAR(30),NO,,census_2022_table (2010-2022) / gastat_rate_implied (2023-2025)
+Silver,silver.population_region_year,basis_detail,NVARCHAR(200),NO,,"how the number was obtained, e.g. serious x 100000 / official_serious_per_100k (workbook, sheet)"
+Silver,silver.population_region_year,source_file,NVARCHAR(400),NO,,census CSV the values were read from
+Silver,silver.population_region_year,dw_create_date,DATETIME2,NO,,Silver load time
+Silver,silver.traffic_region_month,region_code,CHAR(3),NO,PK,administrative region (FK silver.dim_region)
+Silver,silver.traffic_region_month,month_start,DATE,NO,PK,first day of the month
+Silver,silver.traffic_region_month,data_year,SMALLINT,NO,,calendar year
+Silver,silver.traffic_region_month,month_num,TINYINT,NO,,1-12
+Silver,silver.traffic_region_month,adt_per_point,"DECIMAL(12,1)",NO,,average daily intercity vehicles per count point: Car + Truck (2021-2022) or month total / count points / days (2023-2025)
+Silver,silver.traffic_region_month,total_vehicles,"DECIMAL(14,1)",YES,,month total over the region's count points (2023-2025; NULL for 2021-2022)
+Silver,silver.traffic_region_month,count_points,INT,YES,,number of traffic count points in the region (2023-2025)
+Silver,silver.traffic_region_month,definition,VARCHAR(40),NO,,avg_daily_per_count_point (2021-2022) / total_div_points_days (2023-2025)
+Silver,silver.traffic_region_month,traffic_month_index,"DECIMAL(6,3)",NO,,adt_per_point / mean of the region's 12 months of that year (comparable across the two definitions)
+Silver,silver.traffic_region_month,source_file,NVARCHAR(400),NO,,GASTAT workbook
+Silver,silver.traffic_region_month,source_sheet,NVARCHAR(20),NO,,sheet of the workbook
+Silver,silver.traffic_region_month,dw_create_date,DATETIME2,NO,,load timestamp
+Silver,silver.region_service_2025,region_code,CHAR(3),NO,PK,administrative region (FK silver.dim_region)
+Silver,silver.region_service_2025,response_within_s,INT,NO,,"average ambulance response time within cities, seconds (GASTAT 2025, sheet 5-11, MM:SS)"
+Silver,silver.region_service_2025,response_outside_s,INT,NO,,"average ambulance response time outside cities, seconds (GASTAT 2025, sheet 5-11)"
+Silver,silver.region_service_2025,registered_vehicles,BIGINT,NO,,vehicles registered in the region (GASTAT 2025 sheet 4-1-2)
+Silver,silver.region_service_2025,source_file,NVARCHAR(400),NO,,GASTAT workbook
+Silver,silver.region_service_2025,dw_create_date,DATETIME2,NO,,load timestamp
+Silver,silver.dmv_disengagement,disengagement_id,BIGINT,NO,PK,surrogate key
+Silver,silver.dmv_disengagement,report_file,NVARCHAR(400),NO,,DMV report file
+Silver,silver.dmv_disengagement,source_row_num,INT,NO,,line number in the raw file
+Silver,silver.dmv_disengagement,program,VARCHAR(20),NO,,drivered / driverless / first_time
+Silver,silver.dmv_disengagement,manufacturer,NVARCHAR(200),NO,,AV company
+Silver,silver.dmv_disengagement,permit_number,NVARCHAR(50),YES,,DMV permit number
+Silver,silver.dmv_disengagement,vin,NVARCHAR(50),YES,,vehicle identification number
+Silver,silver.dmv_disengagement,event_date,DATE,NO,,disengagement date
+Silver,silver.dmv_disengagement,initiated_by,VARCHAR(20),NO,,who initiated the disengagement
+Silver,silver.dmv_disengagement,location_type,VARCHAR(20),NO,,street / highway_freeway / parking / other
+Silver,silver.dmv_disengagement,cause_category,VARCHAR(30),NO,,environment / perception / localization / system_fault / control / prediction / planning / precautionary / other (keyword rules)
+Silver,silver.dmv_disengagement,description,NVARCHAR(MAX),YES,,facts causing the disengagement (free text)
+Silver,silver.dmv_disengagement,dw_create_date,DATETIME2,NO,,time the Silver row was written
+Silver,silver.dmv_mileage_monthly,permit_number,NVARCHAR(50),NO,PK,DMV permit number
+Silver,silver.dmv_mileage_monthly,vin,NVARCHAR(50),NO,PK,vehicle identification number
+Silver,silver.dmv_mileage_monthly,manufacturer,NVARCHAR(200),NO,,AV company
+Silver,silver.dmv_mileage_monthly,month_start,DATE,NO,PK,first day of the month
+Silver,silver.dmv_mileage_monthly,miles,"DECIMAL(14,2)",NO,,autonomous miles driven in the month
+Silver,silver.dmv_mileage_monthly,dw_create_date,DATETIME2,NO,,time the Silver row was written
+Silver,silver.nhtsa_crash,report_id,NVARCHAR(100),NO,PK,NHTSA report id
+Silver,silver.nhtsa_crash,report_version,INT,NO,,latest version kept
+Silver,silver.nhtsa_crash,source_file,NVARCHAR(400),NO,,raw file the row came from (path under Data/raw)
+Silver,silver.nhtsa_crash,reporting_entity,NVARCHAR(200),YES,,company that filed the report
+Silver,silver.nhtsa_crash,make,NVARCHAR(200),YES,,vehicle make
+Silver,silver.nhtsa_crash,model,NVARCHAR(200),YES,,vehicle model
+Silver,silver.nhtsa_crash,us_state,CHAR(2),YES,,US state code (US stations)
+Silver,silver.nhtsa_crash,city,NVARCHAR(200),YES,,city
+Silver,silver.nhtsa_crash,incident_month,DATE,YES,,incident month
+Silver,silver.nhtsa_crash,incident_time,TIME(0),YES,,incident local time
+Silver,silver.nhtsa_crash,roadway_type,VARCHAR(20),NO,,street / intersection / highway_freeway / parking / other
+Silver,silver.nhtsa_crash,speed_limit_mph,INT,YES,,posted speed limit
+Silver,silver.nhtsa_crash,lighting_raw,NVARCHAR(100),YES,,reported lighting
+Silver,silver.nhtsa_crash,w_clear,BIT,NO,,weather flag clear
+Silver,silver.nhtsa_crash,w_cloudy,BIT,NO,,weather flag cloudy / partly cloudy
+Silver,silver.nhtsa_crash,w_rain,BIT,NO,,weather flag rain
+Silver,silver.nhtsa_crash,w_snow,BIT,NO,,weather flag snow
+Silver,silver.nhtsa_crash,w_fog_smoke_haze,BIT,NO,,weather flag fog/smoke/haze
+Silver,silver.nhtsa_crash,w_dust,BIT,NO,,weather flag dust storm
+Silver,silver.nhtsa_crash,w_wind,BIT,NO,,weather flag severe wind
+Silver,silver.nhtsa_crash,w_unknown,BIT,NO,,weather unknown
+Silver,silver.nhtsa_crash,weather_bucket,VARCHAR(25),NO,FK,"FK silver.dim_condition: dust (Dust Storm) / obscured_unspecified (Fog/Smoke/Haze) / rain (Rain or Snow) / normal (Clear, Cloudy, Partly Cloudy, Severe Wind) / unknown"
+Silver,silver.nhtsa_crash,is_night,BIT,YES,,sun below the horizon (elevation < -0.833 deg)
+Silver,silver.nhtsa_crash,in_scope,BIT,NO,,CA/AZ/TX and incident year 2021-2025
+Silver,silver.nhtsa_crash,dw_create_date,DATETIME2,NO,,time the Silver row was written
+prep (Gold work),prep.weather_station_hour,station_id,CHAR(11),NO,PK,NOAA station id
+prep (Gold work),prep.weather_station_hour,hour_local,DATETIME2(0),NO,PK,local clock hour
+prep (Gold work),prep.weather_station_hour,local_date,DATE,NO,,local date
+prep (Gold work),prep.weather_station_hour,n_reports,INT,NO,,reports in the hour
+prep (Gold work),prep.weather_station_hour,temp_c,"DECIMAL(5,1)",YES,,air temperature degC
+prep (Gold work),prep.weather_station_hour,temp_max_c,"DECIMAL(5,1)",YES,,max temperature degC
+prep (Gold work),prep.weather_station_hour,wind_max_ms,"DECIMAL(5,1)",YES,,max wind m/s
+prep (Gold work),prep.weather_station_hour,precip_mm,"DECIMAL(6,1)",YES,,precipitation mm
+prep (Gold work),prep.weather_station_hour,dew_spread_c,FLOAT,YES,,mean temperature - dew point of the hour's reports (degC)
+prep (Gold work),prep.weather_station_hour,min_dew_spread_c,"DECIMAL(5,1)",YES,,smallest temperature - dew point in the hour (fog_moist rule: <= 2.5 degC)
+prep (Gold work),prep.weather_station_hour,is_dust,BIT,NO,,dust or sand reported
+prep (Gold work),prep.weather_station_hour,is_haze,BIT,NO,,haze or smoke reported
+prep (Gold work),prep.weather_station_hour,is_fog,BIT,NO,,fog reported
+prep (Gold work),prep.weather_station_hour,is_low_vis,BIT,NO,,visibility < 5 km
+prep (Gold work),prep.weather_station_hour,is_obscured,BIT,NO,,dust OR haze OR fog OR visibility < 5 km
+prep (Gold work),prep.weather_station_hour,is_fog_moist,BIT,NO,,"obscured, no dust, and a fog code or min spread <= 2.5 degC"
+prep (Gold work),prep.weather_station_hour,is_haze_dry,BIT,NO,,"obscured, no dust, not fog_moist"
+prep (Gold work),prep.weather_station_hour,is_rain,BIT,NO,,precipitation reported in the hour (raw flag; the hour is a rain hour only if not obscured)
+prep (Gold work),prep.weather_station_hour,is_night,BIT,NO,,sun below the horizon (elevation < -0.833 deg)
+prep (Gold work),prep.weather_station_hour,is_hot40,BIT,NO,,a report >= 40 degC in the hour
+prep (Gold work),prep.weather_station_hour,is_hot45,BIT,NO,,a report >= 45 degC in the hour
+prep (Gold work),prep.weather_station_hour,hour_bucket,VARCHAR(25),NO,FK,FK silver.dim_condition; priority dust > haze_dry > fog_moist > rain > normal
+prep (Gold work),prep.weather_station_day,station_id,CHAR(11),NO,PK,NOAA station id
+prep (Gold work),prep.weather_station_day,local_date,DATE,NO,PK,local date
+prep (Gold work),prep.weather_station_day,hours_observed,INT,NO,,hours with at least one report
+prep (Gold work),prep.weather_station_day,dust_hours,INT,NO,,hours whose bucket is dust
+prep (Gold work),prep.weather_station_day,haze_dry_hours,INT,NO,,hours whose bucket is haze_dry
+prep (Gold work),prep.weather_station_day,fog_moist_hours,INT,NO,,hours whose bucket is fog_moist
+prep (Gold work),prep.weather_station_day,rain_hours,INT,NO,,hours whose bucket is rain (precipitation and not obscured)
+prep (Gold work),prep.weather_station_day,normal_hours,INT,NO,,hours whose bucket is normal
+prep (Gold work),prep.weather_station_day,obscured_hours,INT,NO,,hours with dust OR haze OR fog OR visibility < 5 km
+prep (Gold work),prep.weather_station_day,day_type,VARCHAR(25),NO,FK,FK silver.dim_condition; silver.fn_day_type: >= 3 obscured hours -> the largest of dust / haze_dry / fog_moist (ties in that order); else rain (>= 1 rain hour); else normal
+prep (Gold work),prep.saudi_region_month,region_code,CHAR(3),NO,PK,Saudi administrative region code (3 letters)
+prep (Gold work),prep.saudi_region_month,station_id,CHAR(11),NO,FK,NOAA station id
+prep (Gold work),prep.saudi_region_month,month_start,DATE,NO,PK,first day of the month
+prep (Gold work),prep.saudi_region_month,hours_observed,INT,YES,,hours with at least one report
+prep (Gold work),prep.saudi_region_month,temp_mean_c,"DECIMAL(5,1)",YES,,mean of hourly temperatures degC
+prep (Gold work),prep.saudi_region_month,temp_max_c,"DECIMAL(5,1)",YES,,max temperature degC
+prep (Gold work),prep.saudi_region_month,wind_max_ms,"DECIMAL(5,1)",YES,,max wind m/s
+prep (Gold work),prep.saudi_region_month,mean_dew_spread_c,FLOAT,YES,,mean temperature - dew point over the month's hours
+prep (Gold work),prep.saudi_region_month,dust_hours,INT,YES,,hours with bucket dust
+prep (Gold work),prep.saudi_region_month,haze_dry_hours,INT,YES,,hours with bucket haze_dry
+prep (Gold work),prep.saudi_region_month,fog_moist_hours,INT,YES,,hours with bucket fog_moist
+prep (Gold work),prep.saudi_region_month,rain_hours,INT,YES,,hours with bucket rain
+prep (Gold work),prep.saudi_region_month,normal_hours,INT,YES,,hours with bucket normal
+prep (Gold work),prep.saudi_region_month,haze_hours,INT,YES,,hours with haze
+prep (Gold work),prep.saudi_region_month,fog_hours,INT,YES,,hours with fog
+prep (Gold work),prep.saudi_region_month,low_vis_hours,INT,YES,,hours with visibility < 5 km
+prep (Gold work),prep.saudi_region_month,night_hours,INT,YES,,night hours
+prep (Gold work),prep.saudi_region_month,hot40_hours,INT,YES,,hours with a report >= 40 degC
+prep (Gold work),prep.saudi_region_month,hot45_hours,INT,YES,,hours with a report >= 45 degC
+prep (Gold work),prep.saudi_region_month,days_observed,INT,YES,,days with data
+prep (Gold work),prep.saudi_region_month,dust_days,INT,YES,,days with any dust hour
+prep (Gold work),prep.saudi_region_month,dust_type_days,INT,YES,,days of day type dust
+prep (Gold work),prep.saudi_region_month,haze_dry_days,INT,YES,,days of day type haze_dry
+prep (Gold work),prep.saudi_region_month,fog_moist_days,INT,YES,,days of day type fog_moist
+prep (Gold work),prep.saudi_region_month,rain_days,INT,YES,,rain days
+prep (Gold work),prep.saudi_region_month,normal_days,INT,YES,,normal days
+prep (Gold work),prep.av_relative_risk,event_source,VARCHAR(20),NO,PK,nhtsa_crash / dmv_disengagement
+prep (Gold work),prep.av_relative_risk,factor,VARCHAR(10),NO,PK,weather / light
+prep (Gold work),prep.av_relative_risk,condition_code,VARCHAR(25),NO,PK,FK silver.dim_condition: the level compared with the reference (normal / day)
+prep (Gold work),prep.av_relative_risk,events,INT,NO,,AV events in the analysed strata at this level
+prep (Gold work),prep.av_relative_risk,exposure,FLOAT,YES,,station-hours of the state (NHTSA) or DMV fleet miles (DMV) at this level in the analysed strata
+prep (Gold work),prep.av_relative_risk,rr_crude,FLOAT,YES,,pooled ratio without strata (NHTSA: event share / state-weighted exposure share; DMV: events per mile / normal)
+prep (Gold work),prep.av_relative_risk,rr_adjusted,FLOAT,YES,,Mantel-Haenszel rate ratio over the strata (reference level = 1)
+prep (Gold work),prep.av_relative_risk,ci_low,FLOAT,YES,,"95 % CI lower bound: Greenland-Robins variance x max(1, dispersion)"
+prep (Gold work),prep.av_relative_risk,ci_high,FLOAT,YES,,95 % CI upper bound
+prep (Gold work),prep.av_relative_risk,n_strata,INT,NO,,number of strata (NHTSA: state x month with >= 1 crash; DMV: month x weekday class)
+prep (Gold work),prep.av_relative_risk,dispersion,FLOAT,YES,,Pearson chi2 / df of the fitted stratified model (overdispersion factor)
+prep (Gold work),prep.av_relative_risk,adjustment,VARCHAR(40),NO,,how the ratio is stratified
+prep (Gold work),prep.av_relative_risk,used_in_index,BIT,NO,,1 = applied in Gold: AV crash ratio with >= 30 events and CI lower bound > 1
+prep (Gold work),prep.av_relative_risk,evidence_note,VARCHAR(120),NO,,"why it is used or not (significant penalty - used / no detectable penalty / implausible protective - artefact / no events - uncovered / takeover signal - reported, not a crash weight)"
+Gold,gold.av_readiness_region_month,region_code,CHAR(3),NO,PK,Saudi administrative region code (3 letters)
+Gold,gold.av_readiness_region_month,region_name_en,NVARCHAR(50),NO,,"region name, English"
+Gold,gold.av_readiness_region_month,region_name_ar,NVARCHAR(50),NO,,"region name, Arabic"
+Gold,gold.av_readiness_region_month,weather_station_id,CHAR(11),NO,FK,NOAA station that represents the region
+Gold,gold.av_readiness_region_month,year,SMALLINT,NO,,calendar year
+Gold,gold.av_readiness_region_month,month,TINYINT,NO,,calendar month
+Gold,gold.av_readiness_region_month,month_start,DATE,NO,PK,first day of the month
+Gold,gold.av_readiness_region_month,season,VARCHAR(6),NO,,winter (DJF) / spring / summer / autumn
+Gold,gold.av_readiness_region_month,wx_hours_observed,INT,YES,,hours of the month with weather data
+Gold,gold.av_readiness_region_month,wx_hours_in_month,INT,NO,,hours in the month
+Gold,gold.av_readiness_region_month,wx_coverage_pct,"DECIMAL(5,1)",YES,,observed / total hours %
+Gold,gold.av_readiness_region_month,wx_complete,BIT,NO,,1 = weather present and coverage >= 80 % (filter for every weather analysis)
+Gold,gold.av_readiness_region_month,temp_mean_c,"DECIMAL(5,1)",YES,,mean of hourly temperatures degC
+Gold,gold.av_readiness_region_month,temp_max_c,"DECIMAL(5,1)",YES,,max temperature degC
+Gold,gold.av_readiness_region_month,wind_max_ms,"DECIMAL(5,1)",YES,,max wind m/s
+Gold,gold.av_readiness_region_month,mean_dew_spread_c,"DECIMAL(5,1)",YES,,mean temperature - dew point of the month (small = moist)
+Gold,gold.av_readiness_region_month,share_normal_hours,"DECIMAL(6,4)",YES,,share of hours with bucket normal (the five v2 shares sum to 1)
+Gold,gold.av_readiness_region_month,share_rain_hours,"DECIMAL(6,4)",YES,,share of hours with bucket rain (precipitation and not obscured)
+Gold,gold.av_readiness_region_month,share_fog_moist_hours,"DECIMAL(6,4)",YES,,"share of hours with bucket fog_moist (obscured, no dust, fog code or spread <= 2.5 degC)"
+Gold,gold.av_readiness_region_month,share_haze_dry_hours,"DECIMAL(6,4)",YES,,"share of hours with bucket haze_dry (obscured, no dust, dry air)"
+Gold,gold.av_readiness_region_month,share_dust_hours,"DECIMAL(6,4)",YES,,share of hours with dust or sand reported
+Gold,gold.av_readiness_region_month,share_haze_hours,"DECIMAL(6,4)",YES,,share of hours with haze/smoke
+Gold,gold.av_readiness_region_month,share_fog_hours,"DECIMAL(6,4)",YES,,share of hours with fog
+Gold,gold.av_readiness_region_month,share_low_vis_hours,"DECIMAL(6,4)",YES,,share of hours with visibility < 5 km
+Gold,gold.av_readiness_region_month,share_night_hours,"DECIMAL(6,4)",YES,,share of night hours
+Gold,gold.av_readiness_region_month,share_hot40_hours,"DECIMAL(6,4)",YES,,share of hours with a report >= 40 degC
+Gold,gold.av_readiness_region_month,share_hot45_hours,"DECIMAL(6,4)",YES,,share of hours with a report >= 45 degC
+Gold,gold.av_readiness_region_month,days_observed,INT,YES,,days with data
+Gold,gold.av_readiness_region_month,dust_days,INT,YES,,days with any dust hour
+Gold,gold.av_readiness_region_month,dust_type_days,INT,YES,,days of day type dust
+Gold,gold.av_readiness_region_month,haze_dry_days,INT,YES,,days of day type haze_dry
+Gold,gold.av_readiness_region_month,fog_moist_days,INT,YES,,days of day type fog_moist
+Gold,gold.av_readiness_region_month,rain_days,INT,YES,,days of day type rain
+Gold,gold.av_readiness_region_month,normal_days,INT,YES,,days of day type normal
+Gold,gold.av_readiness_region_month,traffic_adt_per_point,"DECIMAL(12,1)",YES,,average daily intercity vehicles per count point (definition in traffic_definition)
+Gold,gold.av_readiness_region_month,traffic_definition,VARCHAR(40),YES,,avg_daily_per_count_point (2021-2022) / total_div_points_days (2023-2025)
+Gold,gold.av_readiness_region_month,traffic_month_index,"DECIMAL(6,3)",YES,,month / mean of the region's 12 months of that year (comparable across years)
+Gold,gold.av_readiness_region_month,acc_year_serious,INT,YES,,serious accidents in the region in that year (GASTAT)
+Gold,gold.av_readiness_region_month,acc_year_deaths,INT,YES,,deaths in the region in that year
+Gold,gold.av_readiness_region_month,acc_year_injuries,INT,YES,,injuries in the region in that year
+Gold,gold.av_readiness_region_month,acc_year_serious_within_cities,INT,YES,,serious accidents within cities (2024-2025)
+Gold,gold.av_readiness_region_month,acc_year_serious_outside_cities,INT,YES,,serious accidents outside cities (2024-2025)
+Gold,gold.av_readiness_region_month,acc_share_outside_cities,"DECIMAL(6,4)",YES,,outside / (within + outside)
+Gold,gold.av_readiness_region_month,population,INT,YES,,population of the same year: census table (2021-2022) / GASTAT's own denominator recovered from its published rate (2023-2025)
+Gold,gold.av_readiness_region_month,population_basis,VARCHAR(30),YES,,census_2022_table (2021-2022) / gastat_rate_implied (2023-2025)
+Gold,gold.av_readiness_region_month,acc_serious_per_100k,"DECIMAL(9,2)",YES,,"acc_year_serious / population x 100,000"
+Gold,gold.av_readiness_region_month,acc_deaths_per_100k,"DECIMAL(9,2)",YES,,acc_year_deaths / population * 100000
+Gold,gold.av_readiness_region_month,acc_injuries_per_100k,"DECIMAL(9,2)",YES,,acc_year_injuries / population * 100000
+Gold,gold.av_readiness_region_month,road_km_per_1000_people,"DECIMAL(9,3)",YES,,whole network / population
+Gold,gold.av_readiness_region_month,road_km_per_km2,"DECIMAL(9,4)",YES,,whole network / area
+Gold,gold.av_readiness_region_month,intercity_road_km,"DECIMAL(10,1)",YES,,total intercity road length of the region in the year (km; NULL for 2021)
+Gold,gold.av_readiness_region_month,intercity_divided_share,"DECIMAL(6,4)",YES,,(highway + dual carriageway) / intercity total
+Gold,gold.av_readiness_region_month,response_within_s,INT,YES,,"ambulance response time within cities, seconds (GASTAT 2025; same on every row of the region)"
+Gold,gold.av_readiness_region_month,response_outside_s,INT,YES,,"ambulance response time outside cities, seconds (GASTAT 2025)"
+Gold,gold.av_readiness_region_month,registered_vehicles_2025,BIGINT,YES,,vehicles registered in the region (GASTAT 2025)
+Gold,gold.av_readiness_region_month,av_uncovered_share,"DECIMAL(9,6)",YES,,share of hours without any US AV evidence (dust)
+Gold,gold.av_readiness_region_month,av_uncovered_share_cons,"DECIMAL(9,6)",YES,,conservative uncovered share: dust + dry haze
+Gold,gold.av_readiness_region_month,av_crash_multiplier,"DECIMAL(9,6)",YES,,1 + sum over used conditions of share x (RR - 1); today rain only (NHTSA RR)
+Gold,gold.av_readiness_region_month,env_readiness,"DECIMAL(9,6)",YES,,"share of hours inside the US AV evidence envelope: sum share x weight, dust 0, rain 1/RR_rain, other covered conditions 1"
+Gold,gold.av_readiness_region_month,env_readiness_cons,"DECIMAL(9,6)",YES,,env_readiness with dry haze weight 0 (Saudi dry haze is mineral dust; California's is mostly smoke)
+Gold,gold.av_readiness_region_month,src_weather,NVARCHAR(200),NO,,weather lineage
+Gold,gold.av_readiness_region_month,src_accidents,NVARCHAR(400),YES,,accident lineage (workbooks)
+Gold,gold.av_readiness_region_month,src_traffic,NVARCHAR(200),YES,,GASTAT workbook and sheet of the traffic value
+Gold,gold.av_readiness_region_month,src_av,NVARCHAR(200),NO,,which AV evidence produced the av_* columns (prep.av_relative_risk v2: NHTSA state-month MH; DMV month x weekday MH)
+Gold,gold.av_readiness_region_month,gold_batch_id,UNIQUEIDENTIFIER,NO,,Gold load batch
+Gold,gold.av_readiness_region_month,gold_loaded_at,DATETIME2,NO,,time Gold was loaded

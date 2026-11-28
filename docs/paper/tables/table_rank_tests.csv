@@ -1,0 +1,5 @@
+weather_share,year_adjusted_rho,year_adjusted_p,region_only_rho,region_only_p,cross_section_rho,cross_section_p
+dust,0.059,0.676,0.317,0.022,0.049,0.873
+obscured_no_dust,0.019,0.892,-0.101,0.477,0.242,0.426
+rain,-0.101,0.477,-0.282,0.043,-0.324,0.28
+hot40,-0.116,0.413,-0.133,0.346,-0.234,0.442

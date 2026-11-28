@@ -1,87 +1,99 @@
-# دليل إعداد وتشغيل المشروع لفريق العمل (Team Setup & Collaboration Guide)
+# دليل تشغيل المشروع لفريق العمل (Team Setup Guide)
 
-مرحباً بك في فريق عمل مشروع **AV-Ready-Saudi**! 
-تم تصميم هذا الدليل لمساعدة أي عضو في الفريق على استنساخ المشروع وإعداده وتشغيل خط الأنابيب (Pipeline) بالكامل واستيراد البيانات خلال **أقل من 3 دقائق**.
-
----
-
-## 1. المتطلبات الأساسية على جهازك
-1. **Git** مثبت ومربوط بحسابك على GitHub.
-2. **Microsoft SQL Server** (أي نسخة: Developer أو Express أو LocalDB) مع أداة **SSMS** أو `sqlcmd`.
-3. حساب GitHub مع صلاحية الوصول لمستودع المشروع: `https://github.com/farahatsaafan/AV-Ready-Saudi.git`.
+الدليل ده بيوضح إزاي أي حد في التيم ينزّل المشروع والداتا ويشغّل الـ pipeline كله (Bronze → Silver → Gold → EDA والموديلات)
+على جهازه، سواء ماك أو ويندوز. التصميم الحالي: داتا حقيقية بس، العلاقات بين الداتا متعرّفة الأول،
+وجدول Gold واحد (`gold.av_readiness_region_month`). التفاصيل في
+[05_relations_and_lineage.md](05_relations_and_lineage.md)، والـ ERD في [07_erd.md](07_erd.md).
 
 ---
 
-## 2. خطوات التشغيل خطوة بخطوة (Step-by-Step Setup)
+## 1. المتطلبات
 
-### الخطوة 1: استنساخ المستودع (Clone)
-افتح موجه الأوامر (PowerShell أو Git Bash) ونفذ:
+| | ماك | ويندوز |
+|---|---|---|
+| SQL Server | SQL Server 2022 في Docker (container اسمه `sql2022`) | SQL Server محلي (Express أو Developer) |
+| أداة الاستعلام | VS Code + mssql extension، أو DataGrip | SSMS أو VS Code |
+| sqlcmd | موجود جوه الـ container | SQL Server command-line tools (sqlcmd) |
+| Python | Python 3.9+ | Python 3.9+ (على الـ PATH) |
+| Git | ✓ | ✓ |
+
+الـ scripts بتعمل `.venv` وتنزّل `openpyxl` و`pandas` و`numpy` و`statsmodels` و`scipy` و`scikit-learn` و`matplotlib` لوحدها أول مرة.
+
+---
+
+## 2. الخطوات
+
+### الخطوة 1: نزّل الريبو
 ```bash
 git clone https://github.com/farahatsaafan/AV-Ready-Saudi.git
 cd AV-Ready-Saudi
 ```
 
-### الخطوة 2: تحميل حزمة البيانات الرسمية (Data Download)
-نظراً للحجم الكبير لملفات البيانات التاريخية وحساسات القيادة الذاتية، يتم تحميلها من الرابط الرسمي الموحد:
-* **رابط تحميل البيانات من Google Drive:** [تحميل حزمة البيانات المعتمدة AV-Ready-Saudi](https://drive.google.com/drive/folders/1ehqYZj7pMf8gUf-10DxyHAhyGpUt86tH)
-* قم بفك ضغط الملفات داخل مجلد `Data/` في المشروع، ليكون الهيكل كالتالي:
+### الخطوة 2: نزّل الداتا
+* من Google Drive: [New Data](https://drive.google.com/drive/folders/1hmh-0XqcQ9MZ5juEkdRgR7CMA9GsERj3)
+  ← الملف `AV-Ready-Saudi_Data_raw.zip` (حوالي 36MB).
+* فكّ الضغط **جوه فولدر المشروع نفسه**. الـ zip فيه المسارات جاهزة، فالشكل النهائي هيبقى:
   ```text
-  AV-Ready-Saudi/Data/saudi_weather_daily_2019_2024.csv
-  AV-Ready-Saudi/Data/saudi_traffic_accidents_2019_2024.csv
-  AV-Ready-Saudi/Data/av_telemetry_failures_saudi.csv
+  AV-Ready-Saudi/Data/raw/noaa_global_hourly/2021 ... 2025/
+  AV-Ready-Saudi/Data/raw/gastat/
+  AV-Ready-Saudi/Data/raw/gastat_population/
+  AV-Ready-Saudi/Data/raw/ca_dmv_disengagements/
+  AV-Ready-Saudi/Data/raw/ca_dmv_mileage/
+  AV-Ready-Saudi/Data/raw/nhtsa_sgo/
   ```
+* الـ zip فيه بالظبط الملفات اللي الـ pipeline بيقراها (115 ملف). تفاصيل كل مصدر في
+  [DATA_SOURCES.md](DATA_SOURCES.md).
+
+### الخطوة 3: شغّل الـ pipeline
+
+**ماك** (Docker Desktop شغال والـ container `sql2022` شغال):
+```bash
+SA_PASSWORD='باسورد الـ sa بتاعك' bash run_pipeline_mac.sh
+```
+
+**ويندوز** (PowerShell من فولدر المشروع):
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1
+# لو الـ instance مش SQLEXPRESS:
+powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1 -ServerInstance "localhost"
+```
+ملاحظة ويندوز: `BULK INSERT` بيقرا الملفات بحساب خدمة SQL Server، فلازم الحساب ده يقدر يقرا فولدر
+`Data\landing` (أو مرّر مسار تاني بـ `-LandingPath`).
+
+الـ script بيعمل بالترتيب:
+1. `python/00_land_raw.py`: بيحوّل `Data/raw` لـ `Data/landing/*.tsv` (شكل الملف بس، القيم زي ما هي).
+2. `sql/00_init.sql` → `01_bronze.sql` → `02_silver.sql` → `03_gold.sql` مع الـ load procedures بتاعتهم.
+3. `sql/quality/*.sql`: validation وreconciliation وchecks الـ Gold ونسب الداتا الـ 3 views وrollback demo،
+   وبعدها `sql/04_analysis.sql` (الـ EDA: ROLLUP / CUBE / GROUPING SETS / window functions).
+4. `python/02_reference_gold.py`: بناء مستقل بـ pandas لنفس القواعد.
+5. `python/04_av_evidence_models.py`: مراجعة الـ relative risks بالـ GLMs + الـ forest plot.
+6. تصدير جدول Gold لـ `Data/gold_export/` ومقارنته عمود بعمود بالـ reference (`--compare`).
+7. `python/05_readiness_model.py`: الـ readiness score والـ clustering والـ supervised test والـ sensitivity،
+   وبيكتب `docs/reports/04_eda_and_models.md` والرسومات في `docs/figures/`.
+8. `python/06_run_notebook.py`: بيشغّل `notebooks/av_ready_saudi_results.ipynb`، اللي بيطلّع كل figures وجداول
+   الـ Results بتاعة الورقة في `docs/paper/`، وبيتأكد إن نتايجه هي نفس نتايج الـ run.
+
+تقدر كمان تفتح الـ notebook في VS Code (extension اسمها Jupyter)، تختار الـ kernel بتاع `.venv`، وتدوس Run All.
+
+لازم كل الـ checks تطلع **PASS**، والمقارنة في الخطوة 6 تطلع `RESULT: PASS`. التشغيل الكامل بياخد حوالي 7 دقايق على الماك.
+
+### لو عندك database قديمة من التصميم القديم
+مش محتاج تعمل حاجة. `sql/00_init.sql` بيمسح جداول الـ Star Schema القديمة وobjects الـ semantic / ml
+وجدول `audit.load_log` القديم لوحده، وبعدين يكمل عادي.
 
 ---
 
-## 3. تشغيل طبقات المعمارية وفق Medallion Architecture
+## 3. الاتصال بالـ database
 
-يمكنك فتح وتنفيذ ملفات SQL بالترتيب الموضح أدناه عبر **SQL Server Management Studio (SSMS)** أو بالـ Terminal:
-
-### أ) تهيئة الجداول وهياكل البيانات (DDL)
-نفذ السكريبتات الموجودة في `sql/ddl/` بالترتيب:
-1. `01_init_database.sql` (إنشاء قاعدة `av_ready_saudi_dw` وإنشاء الـ Schemas الخمسة).
-2. `02_create_audit_tables.sql` (إنشاء جدول تتبع التدقيق `audit.load_log`).
-3. `03_create_bronze_tables.sql` (إنشاء جداول الهبوط الخام للطبقة البرونزية).
-4. `04_create_silver_tables.sql` (إنشاء الجداول الموثوقة وسجل الاستبعاد `silver.reject_log`).
-5. `05_create_gold_views_tables.sql` (إنشاء جداول الأبعاد والحقائق ومصفوفة الـ Mining للطبقة الذهبية).
-
-### ب) تشغيل العمليات التلقائية (Run Pipelines)
-1. **تحميل طبقة Bronze:**
-   ```sql
-   USE av_ready_saudi_dw;
-   EXEC bronze.load_bronze @base_path = 'D:\AV-Ready-Saudi\Data';
-   ```
-2. **تنظيف وتحويل طبقة Silver:**
-   ```sql
-   USE av_ready_saudi_dw;
-   EXEC silver.load_silver;
-   ```
-3. **توليد الطبقة الذهبية ومؤشر الجاهزية:**
-   ```sql
-   USE av_ready_saudi_dw;
-   EXEC gold.load_gold;
-   ```
-
-### ج) فحص ومطابقة الجودة (Quality Gates)
-* نفذ السكريبت `sql/quality/01_bronze_validation.sql` للتأكد من مطابقة الصفوف (`MATCH`).
-* نفذ السكريبت `sql/quality/02_silver_reconciliation.sql` للتأكد من التوازن الرياضي التام (`BALANCED`).
+* ماك: server `localhost,1433`، user `sa`، database `av_ready_saudi_dw`.
+* ويندوز: server `.\SQLEXPRESS` (أو اسم الـ instance بتاعك)، Windows Authentication.
+* جدول النتيجة: `gold.av_readiness_region_month` (13 منطقة × 60 شهر = 780 صف).
 
 ---
 
-## 4. القواعد المتبعة لإدارة الفروع على Git (Git Workflow)
+## 4. قواعد Git
 
-1. **دائماً اسحب آخر تحديثات من الفرع الرئيسي قبل العمل:**
-   ```bash
-   git pull origin main
-   ```
-2. **أنشئ فرعك الخاص أو استخدم فرعك المخصص:**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-3. **احفظ تغييراتك برسائل واضحة وموجزة:**
-   ```bash
-   git add .
-   git commit -m "feat(module): describe what you built"
-   git push origin feature/your-feature-name
-   ```
-4. **ممنوع نهائياً رفع ملفات البيانات الكبيرة (CSVs/PCD) على GitHub**؛ يتم الاعتماد دائماً على رابط Google Drive الرسمي.
+1. اسحب آخر تحديثات قبل ما تشتغل: `git pull origin main`
+2. اشتغل على البرانش بتاعك (مثلاً `dev-<اسمك>`)، وافتح Pull Request على `main`.
+3. رسائل commit واضحة، مثال: `fix(silver): ...` أو `docs: ...`
+4. **ممنوع ترفع أي داتا على GitHub** (فولدر `Data/` متعمله ignore). الداتا مكانها الدرايف بس.

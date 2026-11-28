@@ -1,0 +1,5 @@
+cluster_name,region_seasons,mean_readiness,members
+High,11,73.2,"Eastern Province autumn, Eastern Province winter, Hail winter, Al-Jouf autumn, Al-Jouf spring, Al-Jouf winter, Northern Borders autumn, Northern Borders spring, Northern Borders winter, Qassim winter, Riyadh winter"
+Medium-high,7,66.2,"Eastern Province summer, Hail summer, Al-Jouf summer, Madinah summer, Northern Borders summer, Qassim summer, Riyadh summer"
+Medium-low,28,56.4,"Aseer autumn, Aseer spring, Aseer summer, Aseer winter, Al-Baha autumn, Al-Baha spring, Al-Baha summer, Al-Baha winter, Hail autumn, Hail spring, Jazan autumn, Jazan spring, Jazan winter, Makkah autumn, Makkah spring, Makkah summer, Makkah winter, Madinah autumn, Madinah spring, Madinah winter, Najran autumn, Najran winter, Qassim autumn, Riyadh autumn, Tabuk autumn, Tabuk spring, Tabuk summer, Tabuk winter"
+Low,6,43.0,"Eastern Province spring, Jazan summer, Najran spring, Najran summer, Qassim spring, Riyadh spring"

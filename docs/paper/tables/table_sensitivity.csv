@@ -1,0 +1,10 @@
+variant,value
+66 weight triples (step 0.1): median tau,0.679
+66 weight triples: minimum tau,0.231
+66 weight triples: share with tau >= 0.7,0.439
+conservative environment (dry haze weight 0): tau,0.897
+rain RR at its CI low 1.145: tau,1.0
+rain RR at its CI high 2.005: tau,1.0
+fog/haze dew-spread threshold 2.0 °C (conservative variant): tau,0.897
+fog/haze dew-spread threshold 2.5 °C (conservative variant): tau,0.897
+fog/haze dew-spread threshold 3.0 °C (conservative variant): tau,0.897

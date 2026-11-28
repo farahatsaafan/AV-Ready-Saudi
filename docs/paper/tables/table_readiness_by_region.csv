@@ -1,0 +1,14 @@
+region_code,rank,region,readiness,environment,safety,infrastructure,worst_season,worst_score,best_season,best_score,tier
+JOF,1,Al-Jouf,86.0,28.7,30.6,26.7,spring,80.4,summer,88.8,top
+EAS,2,Eastern Province,72.0,20.4,31.9,19.6,spring,64.2,autumn,81.3,top
+HAI,3,Hail,70.7,30.2,20.8,19.7,spring,63.7,autumn,73.9,top
+NBR,4,Northern Borders,68.8,26.7,16.7,25.4,spring,62.5,summer,72.3,top
+ASR,5,Aseer,63.8,30.7,13.9,19.3,summer,60.7,autumn,66.3,top
+TAB,6,Tabuk,58.5,30.0,9.7,18.8,spring,53.4,autumn,61.1,middle
+MAK,7,Makkah,57.1,27.7,15.3,14.1,summer,55.8,autumn,58.7,middle
+RIY,8,Riyadh,56.4,17.8,25.0,13.6,spring,38.6,autumn,67.6,middle
+NAJ,9,Najran,54.5,14.4,20.8,19.3,spring,40.1,autumn,71.3,middle
+QAS,10,Qassim,52.5,23.2,12.5,16.8,spring,35.9,autumn,59.5,bottom
+BAH,11,Al-Baha,47.4,27.8,0.0,19.6,spring,41.0,autumn,51.9,bottom
+MED,12,Madinah,44.9,28.6,11.1,5.2,spring,40.8,autumn,48.8,bottom
+JAZ,13,Jazan,43.6,17.9,8.3,17.4,summer,27.2,winter,54.1,bottom

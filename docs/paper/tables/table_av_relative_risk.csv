@@ -1,0 +1,10 @@
+event_source,condition_code,events,exposure,rr_crude,rr_adjusted,ci_low,ci_high,n_strata,dispersion,used_in_index,evidence_note
+dmv_disengagement,dust,0,0.0,,,,,94,8.873,0,no events - uncovered
+dmv_disengagement,fog_moist,12093,4919423.522,1.21,0.973,0.907,1.044,94,8.873,0,no detectable penalty (CI includes 1)
+dmv_disengagement,haze_dry,5954,1775360.045,1.651,1.126,1.03,1.23,94,8.873,0,"takeover signal (CI > 1) - reported, not a crash weight"
+dmv_disengagement,normal,26017,12808797.306,1.0,1.0,,,94,8.873,0,reference level
+dmv_disengagement,rain,4916,3116317.516,0.777,1.044,0.945,1.153,94,8.873,0,no detectable penalty (CI includes 1)
+nhtsa_crash,dust,0,32.0,0.0,0.0,,,144,0.485,0,no events - uncovered
+nhtsa_crash,normal,1804,123140.0,1.0,1.0,,,144,0.485,0,reference level
+nhtsa_crash,obscured_unspecified,2,5761.0,0.023,0.024,0.006,0.098,144,0.485,0,implausible protective - artefact
+nhtsa_crash,rain,70,3466.0,1.4,1.515,1.145,2.005,144,0.485,1,significant penalty - used

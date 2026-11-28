@@ -9,15 +9,41 @@ import csv
 import sys
 
 # Allow large fields (e.g. GeoJSON strings)
-csv.field_size_limit(sys.maxsize)
+# sys.maxsize overflows the C long on 64-bit Windows (Python <= 3.12)
+csv.field_size_limit(min(sys.maxsize, 2**31 - 1))
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Data")
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Data", "raw")
 
-def profile_csv(file_name, delimiter=','):
+# One folder per source (see docs/DATA_SOURCES.md); folders starting with "_" are not used.
+SOURCE_DIRS = sorted(d for d in os.listdir(DATA_DIR)
+                     if os.path.isdir(os.path.join(DATA_DIR, d)) and not d.startswith("_"))
+
+
+def first_csv(folder):
+    """Return the first CSV (relative to DATA_DIR) in a source folder, searching subfolders too."""
+    for root, _, files in sorted(os.walk(os.path.join(DATA_DIR, folder))):
+        for name in sorted(files):
+            if name.lower().endswith(".csv"):
+                return os.path.relpath(os.path.join(root, name), DATA_DIR)
+    return None
+
+
+def sniff_delimiter(file_path):
+    with open(file_path, mode='r', encoding='utf-8-sig', errors='ignore') as f:
+        sample = f.read(64 * 1024)
+    try:
+        return csv.Sniffer().sniff(sample, delimiters=',;\t|').delimiter
+    except csv.Error:
+        return ','
+
+
+def profile_csv(file_name, delimiter=None):
     file_path = os.path.join(DATA_DIR, file_name)
     if not os.path.exists(file_path):
         print(f"[MISSING] {file_name} not found at {file_path}")
         return
+    if delimiter is None:
+        delimiter = sniff_delimiter(file_path)
 
     print("=" * 60)
     print(f"Profiling Source File: {file_name}")
@@ -56,7 +82,10 @@ def profile_csv(file_name, delimiter=','):
 
 if __name__ == "__main__":
     print("Starting AV-Ready-Saudi Source File Inventory...\n")
-    profile_csv("weather-sa-2017-2019-clean.csv", delimiter=',')
-    profile_csv("saudi-arabia-traffic-accidents-and-casualties-injured-dead-2008.csv", delimiter=';')
-    profile_csv(os.path.join("A2RL_IAC_prediction_annotations", "a2rl_raw.csv"), delimiter=',')
+    for folder in SOURCE_DIRS:
+        sample = first_csv(folder)
+        if sample is None:
+            print(f"[SKIP] {folder}: no CSV files (xlsx/pbf sources are read by python/00_land_raw.py)\n")
+            continue
+        profile_csv(sample)
     print("Source profiling complete.")
