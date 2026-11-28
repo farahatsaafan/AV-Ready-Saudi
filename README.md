@@ -126,4 +126,4 @@ run_pipeline_mac.sh / run_pipeline.ps1
   of 0.68; Al-Jouf, Hail and Jazan keep their tier in ≥ 97 % of them. Details, clusters and figures:
   [report 04](docs/reports/04_eda_and_models.md).
 - **Weather → accidents** at region-year level is a null result with this data (year-adjusted rank correlations
-  p ≥ 0.42; no model generalises to an unseen region).
+  p ≥ 0.48; no model generalises to an unseen region).
