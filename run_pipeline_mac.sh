@@ -30,10 +30,17 @@ if [ ! -x .venv/bin/python ]; then
   "${PYTHON:-python3}" -m venv .venv
 fi
 PY=.venv/bin/python
-if ! "$PY" -c "import openpyxl, pandas, numpy, statsmodels, scipy, sklearn, matplotlib, nbformat, nbclient, ipykernel" 2>/dev/null; then
-  echo ">>> Installing the packages of requirements.txt into .venv"
+if ! "$PY" -c "import openpyxl, pandas, numpy, statsmodels, scipy, sklearn, matplotlib" 2>/dev/null; then
+  echo ">>> Installing openpyxl, pandas, numpy, statsmodels, scipy, scikit-learn, matplotlib into .venv"
   "$PY" -m pip install --quiet --upgrade pip
-  "$PY" -m pip install --quiet -r requirements.txt
+  "$PY" -m pip install --quiet openpyxl pandas numpy statsmodels scipy scikit-learn matplotlib
+fi
+# results notebook (step 8) - optional: if these cannot be installed, the pipeline still runs and step 8 is skipped
+if ! "$PY" -c "import nbformat, nbclient, ipykernel" 2>/dev/null; then
+  echo ">>> Installing nbformat, nbclient, ipykernel into .venv (results notebook)"
+  "$PY" -m pip install --quiet nbformat nbclient ipykernel || {
+    echo "Could not install the notebook packages; step 8 will be skipped. pip says:"
+    "$PY" -m pip install nbformat nbclient ipykernel 2>&1 | tail -25 || true; }
 fi
 
 [ -d Data/raw ] || { echo "Missing Data/raw (see docs/DATA_SOURCES.md)"; exit 1; }
@@ -112,8 +119,10 @@ fi
 
 echo
 echo ">>> 8. Results notebook: paper figures and tables (notebooks/av_ready_saudi_results.ipynb)"
-if [ -f notebooks/av_ready_saudi_results.ipynb ]; then
+if [ -f notebooks/av_ready_saudi_results.ipynb ] && "$PY" -c "import nbformat, nbclient, ipykernel" 2>/dev/null; then
   "$PY" python/06_run_notebook.py || echo "Results notebook failed (see above)"
+else
+  echo "Skipped: notebook packages not installed (pip install nbformat nbclient ipykernel)"
 fi
 
 echo

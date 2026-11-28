@@ -50,12 +50,19 @@ if (-not (Test-Path $py)) {
     & $sysPy -m venv .venv
     if ($LASTEXITCODE -ne 0) { throw "Failed: python -m venv .venv" }
 }
-& $py -c "import openpyxl, pandas, numpy, statsmodels, scipy, sklearn, matplotlib, nbformat, nbclient, ipykernel" 2>$null
+& $py -c "import openpyxl, pandas, numpy, statsmodels, scipy, sklearn, matplotlib" 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host ">>> Installing openpyxl, pandas, numpy, statsmodels, scipy, scikit-learn, matplotlib into .venv" -ForegroundColor Yellow
     & $py -m pip install --quiet --upgrade pip
-    & $py -m pip install --quiet -r (Join-Path $PSScriptRoot "requirements.txt")
+    & $py -m pip install --quiet openpyxl pandas numpy statsmodels scipy scikit-learn matplotlib
     if ($LASTEXITCODE -ne 0) { throw "Failed: pip install" }
+}
+# results notebook (step 8) - optional: if these cannot be installed, the pipeline still runs and step 8 is skipped
+& $py -c "import nbformat, nbclient, ipykernel" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ">>> Installing nbformat, nbclient, ipykernel into .venv (results notebook)" -ForegroundColor Yellow
+    & $py -m pip install --quiet nbformat nbclient ipykernel
+    if ($LASTEXITCODE -ne 0) { Write-Host "Could not install the notebook packages; step 8 will be skipped" -ForegroundColor Red }
 }
 
 function Run-Py([string]$Script) {
@@ -120,7 +127,9 @@ if (Test-Path (Join-Path $PSScriptRoot "python\05_readiness_model.py")) {
     if ($LASTEXITCODE -ne 0) { Write-Host "Readiness model failed" -ForegroundColor Red }
 }
 
-if (Test-Path (Join-Path $PSScriptRoot "notebooks\av_ready_saudi_results.ipynb")) {
+& $py -c "import nbformat, nbclient, ipykernel" 2>$null
+$nbOk = ($LASTEXITCODE -eq 0)
+if ($nbOk -and (Test-Path (Join-Path $PSScriptRoot "notebooks\av_ready_saudi_results.ipynb"))) {
     Write-Host ">>> 06_run_notebook.py (paper figures and tables)" -ForegroundColor Yellow
     & $py (Join-Path $PSScriptRoot "python\06_run_notebook.py")
     if ($LASTEXITCODE -ne 0) { Write-Host "Results notebook failed" -ForegroundColor Red }
