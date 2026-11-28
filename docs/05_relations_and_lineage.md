@@ -235,8 +235,9 @@ The crude DMV ratios (fog/haze 1.35 combined, rain 0.78) were confounding: with 
 5. **Accidents are annual.** Monthly rows repeat them: aggregate with MAX / one row per region-year (65 rows).
 6. **Heat** is covered by Phoenix operations (7.5 % of hours ≥ 40 °C) but there is no event-level heat evidence.
 7. **2024 rate revision** in the 2025 workbook; each year uses its own publication.
-8. **Weather 2025** ends on 25 Aug 2025 (Aug 2025 below 80 % coverage; Sep–Dec 2025 without weather: 65 region-months
-   excluded by `wx_complete`).
+8. **Weather 2025** ends on 25 Aug 2025 because NOAA stopped updating ISD after 24 Aug 2025 (superseded by GHCNh, a
+   different product that is not mixed in). Aug 2025 is below 80 % coverage and Sep–Dec 2025 has no weather:
+   65 region-months excluded by `wx_complete`.
 9. **One station per region** (the main airport). **Roads** start in 2022; the within/outside-city split starts in 2024.
    **Traffic** count stations can be added, moved or removed during a year (GASTAT's own note), so traffic levels are
    compared within a region-year through `traffic_month_index`, not across years.

@@ -46,8 +46,12 @@ Notes on the links
 - **California DMV** removed its Disengagement Reports page in 2026 when its AV regulations changed; the file links
   still work, and the page is kept by the Internet Archive (link above, snapshot of 30 Oct 2025).
 - **NOAA**: files were downloaded from NOAA's mirror on AWS Open Data (`noaa-global-hourly-pds`), which carries the
-  same NCEI Global Hourly files; the mirror's 2025 files end in August 2025. The NCEI copy of the same file is
-  listed in the manifest (NCEI may have newer data for 2025).
+  same NCEI Global Hourly (ISD) files. NOAA has superseded ISD with the Global Historical Climatology Network hourly
+  (GHCNh) and states that ISD has no update beyond 24 Aug 2025 ([NCEI notice](https://www.nesdis.noaa.gov/news/service-location-change-integrated-surface-data-global-hourly)); the
+  NCEI download path now redirects to the same mirror (checked 2026-11-28). The last Saudi reports are on
+  25 Aug 2025 local time. Sep–Dec 2025 exist only in GHCNh, a different product (format, station codes,
+  processing); they are not mixed into the ISD series, and the 65 region-months without weather are flagged
+  `wx_complete` = 0.
 - **NHTSA** updates the "current" file regularly; the SHA-256 is of the copy used.
 - Each `noaa_global_hourly/<year>/MANIFEST.csv` was written by the project at download time (bytes, SHA-256 and
   source of each station file); the other folders are covered by `docs/data_files_manifest.csv`.
@@ -204,7 +208,7 @@ data is published) and its **download link** (the file itself).
 
 Notes
 - NOAA data for Saudi stations are the stations' own observations (METAR/SYNOP) archived by NOAA.
-- The NOAA mirror used ends in August 2025.
+- NOAA ISD has no update beyond 24 Aug 2025 (superseded by GHCNh; see the notes on the links above).
 - Considered and dropped (not in the bundle, not loaded): KAPSARC accidents (2016–2019, outside the 2021–2025
   range), UK DfT STATS19 (accidents must be Saudi only), Open-Meteo and CAMS (computed by weather / atmosphere
   models, not measured by a station), OSM road extract (not used by the design).

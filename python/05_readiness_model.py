@@ -615,7 +615,7 @@ def write_report(src, g, rr, rsc, reg_out, cl, info, sup, tests, sens_info, figs
               "Heat: hours >= 40 degC are 6.1 % in Saudi and 7.5 % at Phoenix, where AV fleets run commercially, but there is "
               "no event-level heat evidence.",
               "The 2025 workbook revises the 2024 rates; each year uses its own publication.",
-              "NOAA files end in August 2025: September-December 2025 has no weather.",
+              "NOAA stopped updating its hourly product (ISD) after 24 Aug 2025: September-December 2025 has no weather.",
               "One weather station per region (the main airport).",
               "Association is not causation: the score is an evidence-based estimate of readiness, not a measurement."]:
         A(f"- {t}")

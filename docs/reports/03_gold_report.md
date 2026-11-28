@@ -122,7 +122,7 @@ DMV evidence rows with notes. The exported SQL Gold equals the pandas reference 
 
 ## 9. Known gaps
 
-65 region-months have no usable weather (`wx_complete` = 0): Aug 2025 for all 13 regions (77 % coverage, the NOAA files
-end on 25 Aug 2025) and Sep–Dec 2025 (no files). Accidents, roads and population are annual (same value on the 12 months
+65 region-months have no usable weather (`wx_complete` = 0): Aug 2025 for all 13 regions (77 % coverage: NOAA stopped
+updating ISD after 24 Aug 2025) and Sep–Dec 2025 (no ISD data). Accidents, roads and population are annual (same value on the 12 months
 of a year, not additive over months); road tables start in 2022; the within/outside-cities split starts in 2024; region
 service is 2025 only.

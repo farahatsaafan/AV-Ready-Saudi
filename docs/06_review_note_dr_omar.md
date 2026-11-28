@@ -78,4 +78,4 @@ totals equal GASTAT's published totals; traffic totals equal GASTAT's national r
 Dust has no US AV evidence (treated as uncovered, not as measured risk); Saudi dry haze is mineral dust, California's is
 mostly smoke (hence the conservative variant); DMV reports have no location and NHTSA has month-level dates; crash
 exposure is weather time, not AV miles; accidents are annual; GASTAT revised its 2024 rates in the 2025 workbook; Saudi
-weather ends in August 2025; one station per region; association is not causation.
+weather ends on 25 Aug 2025, when NOAA stopped updating the product (ISD); one station per region; association is not causation.

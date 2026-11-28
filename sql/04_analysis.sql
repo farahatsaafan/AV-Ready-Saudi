@@ -153,7 +153,7 @@ FROM ry ORDER BY region_code, [year];
 -- Business question: do regions have more serious accidents in their most obscured year (dust + dry haze)
 --                    than in their least obscured year? Rates are year-adjusted (region rate / national
 --                    rate of the same year) so national trends do not masquerade as weather. 2021-2024 only
---                    (2025 weather ends in August).
+--                    (2025 weather ends on 25 Aug: NOAA stopped updating ISD).
 -- Finding (run of 28 Nov 2026): 10 of 13 regions have a higher year-adjusted rate in their most obscured year, but the most obscured
 --   year is 2022 for 12 of 13 regions, so the comparison is mostly 2022 vs 2023/2024. With the year's mean
 --   relative rate removed only 9 of 13 are higher (Wilcoxon p 0.27), and the within-region, year-adjusted
@@ -187,11 +187,11 @@ FROM x GROUP BY region_code ORDER BY region_code;
 -- ------------------------------------------------------------------------------
 -- E9. Data-quality view
 -- Business question: which months must be left out of weather analysis, and why?
--- Finding (run of 28 Nov 2026): 65 region-months are excluded: Aug 2025 for all 13 regions (coverage 76.9-77.0 %: the NOAA files end
---   on 25 Aug 2025) and Sep-Dec 2025 for all 13 regions (no weather file). No other month is below 80 %.
+-- Finding (run of 28 Nov 2026): 65 region-months are excluded: Aug 2025 for all 13 regions (coverage 76.9-77.0 %: NOAA stopped
+--   updating ISD after 24 Aug 2025) and Sep-Dec 2025 for all 13 regions (no ISD data). No other month is below 80 %.
 -- ------------------------------------------------------------------------------
 SELECT region_code, month_start, wx_hours_observed, wx_coverage_pct,
-       CASE WHEN wx_hours_observed IS NULL THEN 'no weather data (NOAA files end in Aug 2025 / station gap)'
+       CASE WHEN wx_hours_observed IS NULL THEN 'no weather data (NOAA ISD ends 24 Aug 2025 / station gap)'
             ELSE 'coverage below 80 %' END AS reason
 FROM gold.av_readiness_region_month
 WHERE wx_complete = 0
